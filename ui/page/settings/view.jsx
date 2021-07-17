@@ -44,9 +44,9 @@ type DaemonSettings = {
 
 type Props = {
   setDaemonSetting: (string, ?SetDaemonSettingArg) => void,
-  clearDaemonSetting: string => void,
+  clearDaemonSetting: (string) => void,
   setClientSetting: (string, SetDaemonSettingArg) => void,
-  toggle3PAnalytics: boolean => void,
+  toggle3PAnalytics: (boolean) => void,
   clearCache: () => Promise<any>,
   daemonSettings: DaemonSettings,
   allowAnalytics: boolean,
@@ -57,20 +57,21 @@ type Props = {
   currentTheme: string,
   themes: Array<string>,
   automaticDarkModeEnabled: boolean,
+  clock24h: boolean,
   autoplay: boolean,
   updateWalletStatus: () => void,
   walletEncrypted: boolean,
-  userBlockedChannelsCount?: number,
   confirmForgetPassword: ({}) => void,
   floatingPlayer: boolean,
   hideReposts: ?boolean,
   clearPlayingUri: () => void,
   darkModeTimes: DarkModeTimes,
   setDarkTime: (string, {}) => void,
-  openModal: string => void,
+  openModal: (string) => void,
   language?: string,
   enterSettings: () => void,
   exitSettings: () => void,
+  myChannelUrls: ?Array<string>,
 };
 
 type State = {
@@ -98,7 +99,7 @@ class SettingsPage extends React.PureComponent<Props, State> {
 
     if (isAuthenticated || !IS_WEB) {
       this.props.updateWalletStatus();
-      getPasswordFromCookie().then(p => {
+      getPasswordFromCookie().then((p) => {
         if (typeof p === 'string') {
           this.setState({ storedPassword: true });
         }
@@ -126,6 +127,10 @@ class SettingsPage extends React.PureComponent<Props, State> {
     this.props.setClientSetting(SETTINGS.AUTOMATIC_DARK_MODE_ENABLED, value);
   }
 
+  onClock24hChange(value: boolean) {
+    this.props.setClientSetting(SETTINGS.CLOCK_24H, value);
+  }
+
   onConfirmForgetPassword() {
     const { confirmForgetPassword } = this.props;
     confirmForgetPassword({
@@ -141,7 +146,11 @@ class SettingsPage extends React.PureComponent<Props, State> {
     this.props.setDarkTime(value, options);
   }
 
-  to12Hour(time: string) {
+  formatHour(time: string, clock24h: boolean) {
+    if (clock24h) {
+      return `${time}:00`;
+    }
+
     const now = new Date(0, 0, 0, Number(time));
 
     const hour = now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit' });
@@ -166,19 +175,20 @@ class SettingsPage extends React.PureComponent<Props, State> {
       currentTheme,
       themes,
       automaticDarkModeEnabled,
+      clock24h,
       autoplay,
       walletEncrypted,
       // autoDownload,
       setDaemonSetting,
       setClientSetting,
       toggle3PAnalytics,
-      userBlockedChannelsCount,
       floatingPlayer,
       hideReposts,
       clearPlayingUri,
       darkModeTimes,
       clearCache,
       openModal,
+      myChannelUrls,
     } = this.props;
     const { storedPassword } = this.state;
     const noDaemonSettings = !daemonSettings || Object.keys(daemonSettings).length === 0;
@@ -195,6 +205,22 @@ class SettingsPage extends React.PureComponent<Props, State> {
         }}
         className="card-stack"
       >
+        {/* @if TARGET='web' */}
+        <Card
+          title={__('Add card to tip creators in USD')}
+          actions={
+            <div className="section__actions">
+              <Button
+                button="secondary"
+                label={__('Manage Card')}
+                icon={ICONS.WALLET}
+                navigate={`/$/${PAGES.SETTINGS_STRIPE_CARD}`}
+              />
+            </div>
+          }
+        />
+        {/* @endif */}
+
         <Card title={__('Language')} actions={<SettingLanguage />} />
         {homepages && Object.keys(homepages).length > 1 && (
           <Card title={__('Homepage')} actions={<HomepageSelector />} />
@@ -262,7 +288,7 @@ class SettingsPage extends React.PureComponent<Props, State> {
                       value={currentTheme}
                       disabled={automaticDarkModeEnabled}
                     >
-                      {themes.map(theme => (
+                      {themes.map((theme) => (
                         <option key={theme} value={theme}>
                           {theme === 'light' ? __('Light') : __('Dark')}
                         </option>
@@ -281,32 +307,41 @@ class SettingsPage extends React.PureComponent<Props, State> {
                       <fieldset-group class="fieldset-group--smushed">
                         <FormField
                           type="select"
-                          name="automatic_dark_mode_range"
-                          onChange={value => this.onChangeTime(value, { fromTo: 'from', time: 'hour' })}
+                          name="automatic_dark_mode_range_start"
+                          onChange={(value) => this.onChangeTime(value, { fromTo: 'from', time: 'hour' })}
                           value={darkModeTimes.from.hour}
                           label={__('From --[initial time]--')}
                         >
-                          {startHours.map(time => (
+                          {startHours.map((time) => (
                             <option key={time} value={time}>
-                              {this.to12Hour(time)}
+                              {this.formatHour(time, clock24h)}
                             </option>
                           ))}
                         </FormField>
                         <FormField
                           type="select"
-                          name="automatic_dark_mode_range"
+                          name="automatic_dark_mode_range_end"
                           label={__('To --[final time]--')}
-                          onChange={value => this.onChangeTime(value, { fromTo: 'to', time: 'hour' })}
+                          onChange={(value) => this.onChangeTime(value, { fromTo: 'to', time: 'hour' })}
                           value={darkModeTimes.to.hour}
                         >
-                          {endHours.map(time => (
+                          {endHours.map((time) => (
                             <option key={time} value={time}>
-                              {this.to12Hour(time)}
+                              {this.formatHour(time, clock24h)}
                             </option>
                           ))}
                         </FormField>
                       </fieldset-group>
                     )}
+                  </fieldset-section>
+                  <fieldset-section>
+                    <FormField
+                      type="checkbox"
+                      name="clock24h"
+                      onChange={() => this.onClock24hChange(!clock24h)}
+                      checked={clock24h}
+                      label={__('24-hour clock')}
+                    />
                   </fieldset-section>
                 </React.Fragment>
               }
@@ -342,7 +377,7 @@ class SettingsPage extends React.PureComponent<Props, State> {
                   <FormField
                     type="checkbox"
                     name="hide_reposts"
-                    onChange={e => {
+                    onChange={(e) => {
                       if (isAuthenticated) {
                         let param = e.target.checked ? { add: 'noreposts' } : { remove: 'noreposts' };
                         Lbryio.call('user_tag', 'edit', param);
@@ -411,7 +446,7 @@ class SettingsPage extends React.PureComponent<Props, State> {
                   <FormField
                     type="checkbox"
                     name="share_third_party"
-                    onChange={e => toggle3PAnalytics(e.target.checked)}
+                    onChange={(e) => toggle3PAnalytics(e.target.checked)}
                     checked={allowAnalytics}
                     label={__('Allow the app to access third party analytics platforms')}
                     helper={__('We use detailed analytics to improve all aspects of the LBRY experience.')}
@@ -438,25 +473,34 @@ class SettingsPage extends React.PureComponent<Props, State> {
                 />
 
                 <Card
-                  title={__('Blocked channels')}
-                  subtitle={
-                    userBlockedChannelsCount === 0
-                      ? __("You don't have blocked channels.")
-                      : userBlockedChannelsCount === 1
-                      ? __('You have one blocked channel.')
-                      : __('You have %channels% blocked channels.', { channels: userBlockedChannelsCount })
-                  }
+                  title={__('Blocked and muted channels')}
                   actions={
                     <div className="section__actions">
                       <Button
                         button="secondary"
                         label={__('Manage')}
                         icon={ICONS.SETTINGS}
-                        navigate={`/$/${PAGES.BLOCKED}`}
+                        navigate={`/$/${PAGES.SETTINGS_BLOCKED_MUTED}`}
                       />
                     </div>
                   }
                 />
+
+                {myChannelUrls && myChannelUrls.length > 0 && (
+                  <Card
+                    title={__('Creator settings')}
+                    actions={
+                      <div className="section__actions">
+                        <Button
+                          button="secondary"
+                          label={__('Manage')}
+                          icon={ICONS.SETTINGS}
+                          navigate={`/$/${PAGES.SETTINGS_CREATOR}`}
+                        />
+                      </div>
+                    }
+                  />
+                )}
 
                 <Card
                   title={__('Advanced settings')}

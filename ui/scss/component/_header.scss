@@ -16,7 +16,7 @@
 
 .header--minimal {
   box-shadow: none;
-  background-color: transparent;
+  background-color: var(--color-background);
   border-bottom: none;
 }
 
@@ -46,10 +46,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-
-  > .button:only-child {
-    margin-left: auto;
-  }
 }
 
 .header__buttons {
@@ -69,14 +65,6 @@
   svg {
     stroke: var(--color-text);
   }
-
-  &:hover {
-    color: var(--color-link-active);
-
-    svg {
-      stroke: var(--color-link-active);
-    }
-  }
 }
 
 .header__navigation-item--back,
@@ -88,7 +76,7 @@
   margin-right: var(--spacing-s);
 
   &:hover {
-    background-color: var(--color-primary-alt);
+    background-color: var(--color-header-button-hover);
   }
 
   @media (min-width: $breakpoint-small) {
@@ -105,15 +93,12 @@
 }
 
 .header__navigation-item--profile-pic {
+  margin-left: var(--spacing-m);
+
   .channel-thumbnail {
     height: var(--height-button);
     width: var(--height-button);
     margin-right: 0;
-    border-radius: calc(var(--height-button) / 2);
-
-    img {
-      border-radius: calc(var(--height-button) / 2);
-    }
   }
 
   &:hover {
@@ -122,7 +107,13 @@
 }
 
 .header__navigation-item--balance {
-  @extend .button--link;
+  @extend .button--file-action;
+  margin: 0 var(--spacing-s);
+  color: var(--color-text);
+
+  &:hover {
+    color: var(--color-text);
+  }
 }
 
 .header__navigation-item--forward {
@@ -136,11 +127,29 @@
 }
 
 .header__navigation-item--lbry {
-  padding: var(--spacing-s);
-
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  margin-left: var(--spacing-m);
+  margin-right: var(--spacing-m);
+  // move to lbry theme?
   .lbry-icon {
     height: var(--height-button);
     width: var(--height-button);
+  }
+  @media (max-width: $breakpoint-small) {
+    margin-right: var(--spacing-m);
+    height: 5rem;
+
+    .button__label {
+      display: none;
+    }
+  }
+}
+
+.header--minimal {
+  .header__navigation-item--lbry {
+    height: 3rem;
   }
 }
 

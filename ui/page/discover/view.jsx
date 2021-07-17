@@ -1,6 +1,7 @@
 // @flow
-import { SHOW_ADS, DOMAIN } from 'config';
+import { SHOW_ADS, DOMAIN, SIMPLE_SITE, ENABLE_NO_SOURCE_CLAIMS } from 'config';
 import * as ICONS from 'constants/icons';
+import * as PAGES from 'constants/pages';
 import React, { useRef } from 'react';
 import Page from 'component/page';
 import ClaimListDiscover from 'component/claimListDiscover';
@@ -14,14 +15,15 @@ import * as CS from 'constants/claim_search';
 import Ads from 'web/component/ads';
 import LbcSymbol from 'component/common/lbc-symbol';
 import I18nMessage from 'component/i18nMessage';
+import useGetLivestreams from 'effects/use-get-livestreams';
 
 type Props = {
   location: { search: string },
   followedTags: Array<Tag>,
   repostedUri: string,
   repostedClaim: ?GenericClaim,
-  doToggleTagFollowDesktop: string => void,
-  doResolveUri: string => void,
+  doToggleTagFollowDesktop: (string) => void,
+  doResolveUri: (string) => void,
   isAuthenticated: boolean,
   dynamicRouteProps: RowDataItem,
   tileLayout: boolean,
@@ -42,6 +44,7 @@ function DiscoverPage(props: Props) {
   const buttonRef = useRef();
   const isHovering = useHover(buttonRef);
   const isMobile = useIsMobile();
+  const { livestreamMap } = useGetLivestreams();
 
   const urlParams = new URLSearchParams(search);
   const claimType = urlParams.get('claim_type');
@@ -82,6 +85,13 @@ function DiscoverPage(props: Props) {
       <span>
         <Icon icon={ICONS.TAG} size={10} />
         {(tag === CS.TAGS_ALL && __('All Content')) || (tag === CS.TAGS_FOLLOWED && __('Followed Tags')) || tag}
+
+        <Button
+          className="claim-search__tags-link"
+          button="link"
+          label={__('Manage Tags')}
+          navigate={`/$/${PAGES.TAGS_FOLLOWING_MANAGE}`}
+        />
       </span>
     );
   } else {
@@ -104,7 +114,9 @@ function DiscoverPage(props: Props) {
         tags={tags}
         hiddenNsfwMessage={<HiddenNsfw type="page" />}
         repostedClaimId={repostedClaim ? repostedClaim.claim_id : null}
-        injectedItem={SHOW_ADS && !isAuthenticated && IS_WEB && <Ads type="video" />}
+        injectedItem={
+          SHOW_ADS && IS_WEB ? (SIMPLE_SITE ? false : !isAuthenticated && <Ads small type={'video'} />) : false
+        }
         channelIds={
           (dynamicRouteProps && dynamicRouteProps.options && dynamicRouteProps.options.channelIds) || undefined
         }
@@ -138,6 +150,10 @@ function DiscoverPage(props: Props) {
             )
           )
         }
+        liveLivestreamsFirst
+        livestreamMap={livestreamMap}
+        hasSource
+        showNoSourceClaims={ENABLE_NO_SOURCE_CLAIMS}
       />
     </Page>
   );

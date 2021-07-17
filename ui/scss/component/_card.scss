@@ -10,6 +10,11 @@
   }
 }
 
+.card--enable-overflow {
+  overflow: visible;
+  margin-bottom: var(--spacing-m);
+}
+
 .card--disabled {
   opacity: 0.3;
   pointer-events: none;
@@ -17,7 +22,7 @@
 
 .card--section {
   position: relative;
-  padding: var(--spacing-l);
+  padding: var(--spacing-m);
 }
 
 .card--reward-total {
@@ -32,6 +37,16 @@
   border: 1px solid var(--color-border);
   border-radius: var(--card-radius);
   margin-bottom: var(--spacing-m);
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.card-collection-selector {
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  margin-bottom: var(--spacing-s);
 
   &:last-of-type {
     margin-bottom: 0;
@@ -82,23 +97,22 @@
 
 .card__title-section {
   @extend .section__flex;
-  padding: var(--spacing-m) var(--spacing-l);
 
-  @media (max-width: $breakpoint-small) {
-    padding: 0;
+  @media (min-width: $breakpoint-small) {
+    padding: var(--spacing-s) var(--spacing-m);
   }
 }
 
 .card__title-section--body-list {
-  padding: var(--spacing-m);
+  padding-left: var(--spacing-s);
 
-  @media (max-width: $breakpoint-small) {
-    padding: 0;
+  @media (min-width: $breakpoint-small) {
+    padding: var(--spacing-m);
   }
 }
 
 .card__title-section--small {
-  padding: var(--spacing-s) var(--spacing-m);
+  padding: var(--spacing-s);
 }
 
 .card__actions--inline {
@@ -175,7 +189,7 @@
 .card__title {
   display: block;
   align-items: center;
-  font-size: var(--font-title);
+  font-size: var(--font-large);
   font-weight: var(--font-weight-light);
 
   & > *:not(:last-child) {
@@ -198,14 +212,27 @@
   font-size: var(--font-body);
 }
 
+.card__title-actions-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .card__title-actions {
   align-self: flex-start;
-  padding: var(--spacing-m);
-  padding-right: var(--spacing-l);
 
-  @media (max-width: $breakpoint-small) {
-    padding: 0;
+  @media (min-width: $breakpoint-small) {
+    padding: var(--spacing-s);
   }
+}
+
+.card__title-actions--link {
+  margin-top: var(--spacing-xs);
+  margin-right: var(--spacing-xs);
+}
+
+.card__title-actions--small {
+  padding: 0;
 }
 
 .card__title.card__title--deprecated {
@@ -225,6 +252,13 @@
   }
 }
 
+.card__title--help {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 0;
+}
+
 .card__media--nsfw {
   background-color: black;
 }
@@ -242,8 +276,15 @@
 .card__header--between {
   @extend .card__header;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
+
+  @media (max-width: $breakpoint-small) {
+    padding: var(--spacing-s);
+    padding-bottom: 0;
+    margin: 0;
+    margin-bottom: var(--spacing-s);
+  }
 }
 
 .card__header--nowrap {
@@ -258,7 +299,7 @@
 }
 
 .card__body {
-  padding: var(--spacing-l);
+  padding: var(--spacing-m);
 
   &:not(.card__body--no-title) {
     padding-top: 0;
@@ -267,6 +308,7 @@
   &.card__body--list {
     padding: 0;
     border-top: 1px solid var(--color-border);
+    margin-bottom: 0;
   }
 
   @media (max-width: $breakpoint-small) {
@@ -274,11 +316,17 @@
   }
 }
 
+.card__body-scrollable {
+  overflow-y: auto;
+  max-height: 30vh;
+}
+
 .card__main-actions {
-  padding: var(--spacing-l);
+  padding: var(--spacing-m);
   padding-bottom: 0;
-  margin-bottom: var(--spacing-l);
+  margin-bottom: var(--spacing-s);
   border-top: 1px solid var(--color-border);
+  height: 100%;
 
   &:only-child {
     border-top: none;
@@ -286,10 +334,10 @@
 }
 
 .card__body-actions {
-  padding: var(--spacing-l);
+  padding: var(--spacing-s);
 
-  @media (max-width: $breakpoint-small) {
-    padding: var(--spacing-s);
+  @media (min-width: $breakpoint-small) {
+    padding: var(--spacing-m);
   }
 }
 
@@ -313,15 +361,12 @@
   }
 }
 
-.card__header,
 .card__body,
 .card__main-actions {
-  @media (max-width: $breakpoint-small) {
-    padding: var(--spacing-s);
-    padding-bottom: 0;
-    margin: 0;
-    margin-bottom: var(--spacing-s);
-  }
+  padding: var(--spacing-m);
+  padding-bottom: 0;
+  margin: 0;
+  margin-bottom: var(--spacing-m);
 }
 
 .card__bottom-gutter {
@@ -337,5 +382,33 @@
 
   > *:not(:last-child) {
     margin-right: var(--spacing-m);
+  }
+}
+
+.card__bottom-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card__multi-pane {
+  display: flex;
+
+  @media (max-width: $breakpoint-small) {
+    flex-direction: column;
+  }
+
+  .card__main-actions {
+    height: unset;
+  }
+
+  .card__second-pane {
+    border-left: 1px solid var(--color-border);
+    max-width: 50%;
+
+    @media (max-width: $breakpoint-small) {
+      border-top: 1px solid var(--color-border);
+      max-width: 100%;
+    }
   }
 }

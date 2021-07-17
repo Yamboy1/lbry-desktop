@@ -12,7 +12,7 @@ import { Lbry } from 'lbry-redux';
 type Props = {
   children: Node,
   history: {
-    replace: string => void,
+    replace: (string) => void,
   },
 };
 
@@ -36,7 +36,7 @@ class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error, errorInfo) {
     // @if TARGET='web'
-    analytics.sentryError(error, errorInfo).then(sentryEventId => {
+    analytics.sentryError(error, errorInfo).then((sentryEventId) => {
       this.setState({ sentryEventId });
     });
     // @endif
@@ -49,7 +49,7 @@ class ErrorBoundary extends React.Component<Props, State> {
         errorMessage += `sdk version: ${sdkVersion}\n`;
         errorMessage += `page: ${window.location.href.split('.html')[1]}\n`;
         errorMessage += `${error.stack}`;
-        analytics.error(errorMessage).then(isSharingData => {
+        analytics.error(errorMessage).then((isSharingData) => {
           this.setState({ desktopErrorReported: isSharingData });
         });
       });

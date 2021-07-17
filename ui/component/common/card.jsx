@@ -20,6 +20,9 @@ type Props = {
   defaultExpand?: boolean,
   nag?: Node,
   smallTitle?: boolean,
+  onClick?: () => void,
+  children?: Node,
+  secondPane?: Node,
 };
 
 export default function Card(props: Props) {
@@ -37,66 +40,91 @@ export default function Card(props: Props) {
     smallTitle = false,
     defaultExpand,
     nag,
+    onClick,
+    children,
+    secondPane,
   } = props;
   const [expanded, setExpanded] = useState(defaultExpand);
   const expandable = defaultExpand !== undefined;
 
   return (
-    <section className={classnames(className, 'card')}>
-      {(title || subtitle) && (
-        <div
-          className={classnames('card__header--between', {
-            'card__header--nowrap': noTitleWrap,
-          })}
-        >
+    <section
+      role={onClick ? 'button' : undefined}
+      className={classnames(className, 'card', {
+        'card__multi-pane': Boolean(secondPane),
+      })}
+      onClick={(e) => {
+        if (onClick) {
+          onClick();
+          e.stopPropagation();
+        }
+      }}
+    >
+      <div>
+        {(title || subtitle) && (
           <div
-            className={classnames('card__title-section', {
-              'card__title-section--body-list': isBodyList,
-              'card__title-section--small': smallTitle,
+            className={classnames('card__header--between', {
+              'card__header--nowrap': noTitleWrap,
             })}
           >
-            {icon && <Icon sectionIcon icon={icon} />}
-            <div>
-              {isPageTitle && <h1 className="card__title">{title}</h1>}
-              {!isPageTitle && (
-                <h2 className={classnames('card__title', { 'card__title--small': smallTitle })}>{title}</h2>
-              )}
-              {subtitle && <div className="card__subtitle">{subtitle}</div>}
-            </div>
-          </div>
-          <div>
-            {titleActions && <div className="card__title-actions">{titleActions}</div>}
-            {expandable && (
-              <div className="card__title-actions">
-                <Button
-                  button="alt"
-                  aria-expanded={expanded}
-                  aria-label={expanded ? __('Less') : __('More')}
-                  icon={expanded ? ICONS.SUBTRACT : ICONS.ADD}
-                  onClick={() => setExpanded(!expanded)}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {(!expandable || (expandable && expanded)) && (
-        <>
-          {body && (
             <div
-              className={classnames('card__body', {
-                'card__body--no-title': !title && !subtitle,
-                'card__body--list': isBodyList,
+              className={classnames('card__title-section', {
+                'card__title-section--body-list': isBodyList,
+                'card__title-section--small': smallTitle,
               })}
             >
-              {body}
+              {icon && <Icon sectionIcon icon={icon} />}
+              <div>
+                {isPageTitle && <h1 className="card__title">{title}</h1>}
+                {!isPageTitle && (
+                  <h2 className={classnames('card__title', { 'card__title--small': smallTitle })}>{title}</h2>
+                )}
+                {subtitle && <div className="card__subtitle">{subtitle}</div>}
+              </div>
             </div>
-          )}
-          {actions && <div className="card__main-actions">{actions}</div>}
-        </>
-      )}
-
-      {nag}
+            <div className="card__title-actions-container">
+              {titleActions && (
+                <div
+                  className={classnames('card__title-actions', {
+                    'card__title-actions--small': smallTitle,
+                  })}
+                >
+                  {titleActions}
+                </div>
+              )}
+              {expandable && (
+                <div className="card__title-actions">
+                  <Button
+                    button="alt"
+                    aria-expanded={expanded}
+                    aria-label={expanded ? __('Less') : __('More')}
+                    icon={expanded ? ICONS.SUBTRACT : ICONS.ADD}
+                    onClick={() => setExpanded(!expanded)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {(!expandable || (expandable && expanded)) && (
+          <>
+            {body && (
+              <div
+                className={classnames('card__body', {
+                  'card__body--no-title': !title && !subtitle,
+                  'card__body--list': isBodyList,
+                })}
+              >
+                {body}
+              </div>
+            )}
+            {actions && <div className="card__main-actions">{actions}</div>}
+            {children && <div className="card__main-actions">{children}</div>}
+          </>
+        )}
+        {nag}
+      </div>
+      {secondPane && <div className="card__second-pane">{secondPane}</div>}
     </section>
   );
 }

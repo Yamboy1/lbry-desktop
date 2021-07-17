@@ -8,7 +8,9 @@ import classnames from 'classnames';
 import Icon from 'component/common/icon';
 import NotificationBubble from 'component/notificationBubble';
 import I18nMessage from 'component/i18nMessage';
-import { PINNED_LABEL_1, PINNED_URI_1, PINNED_URI_2, PINNED_LABEL_2, SIMPLE_SITE } from 'config';
+import ChannelThumbnail from 'component/channelThumbnail';
+import { GetLinksData } from 'util/buildHomepage';
+import { SIMPLE_SITE, DOMAIN, ENABLE_UI_NOTIFICATIONS } from 'config';
 // @if TARGET='app'
 import { IS_MAC } from 'component/app/view';
 // @endif
@@ -38,10 +40,10 @@ type Props = {
   uploadCount: number,
   doSignOut: () => void,
   sidebarOpen: boolean,
-  setSidebarOpen: boolean => void,
+  setSidebarOpen: (boolean) => void,
   isMediumScreen: boolean,
   isOnFilePage: boolean,
-  unreadCount: number,
+  unseenCount: number,
   purchaseSuccess: boolean,
   doClearPurchasedUriSuccess: () => void,
   user: ?User,
@@ -51,6 +53,7 @@ type Props = {
 type SideNavLink = {
   title: string,
   link?: string,
+  route?: string,
   onClick?: () => any,
   icon: string,
   extra?: Node,
@@ -60,7 +63,6 @@ type SideNavLink = {
 function SideNavigation(props: Props) {
   const {
     subscriptions,
-    followedTags,
     doSignOut,
     email,
     purchaseSuccess,
@@ -69,13 +71,13 @@ function SideNavigation(props: Props) {
     setSidebarOpen,
     isMediumScreen,
     isOnFilePage,
-    unreadCount,
+    unseenCount,
     homepageData,
     user,
+    followedTags,
   } = props;
 
-  const { EXTRA_SIDEBAR_LINKS } = homepageData;
-
+  const EXTRA_SIDEBAR_LINKS = GetLinksData(homepageData);
   const FULL_LINKS: Array<SideNavLink> = [
     {
       title: 'Your Tags',
@@ -195,36 +197,43 @@ function SideNavigation(props: Props) {
     },
   ];
 
-  if (PINNED_URI_1 && PINNED_LABEL_1) {
-    MOBILE_LINKS.push({
-      title: PINNED_LABEL_1,
-      link: PINNED_URI_1,
-      icon: ICONS.PINNED,
-    });
-  }
-
-  if (PINNED_URI_2 && PINNED_LABEL_2) {
-    MOBILE_LINKS.push({
-      title: PINNED_LABEL_2,
-      link: PINNED_URI_2,
-      icon: ICONS.PINNED,
-    });
-  }
-
-  const notificationsEnabled = user && user.experimental_ui;
+  const notificationsEnabled = ENABLE_UI_NOTIFICATIONS || (user && user.experimental_ui);
   const isAuthenticated = Boolean(email);
   // SIDE LINKS: FOLLOWING, HOME, [FULL,] [EXTRA]
   let SIDE_LINKS: Array<SideNavLink> = [];
 
   SIDE_LINKS.push(HOME);
   SIDE_LINKS.push(RECENT_FROM_FOLLOWING);
-
-  if (EXTRA_SIDEBAR_LINKS) {
-    SIDE_LINKS.push(...EXTRA_SIDEBAR_LINKS);
+  if (!SIMPLE_SITE) {
+    FULL_LINKS.push({
+      title: 'Lists',
+      link: `/$/${PAGES.LISTS}`,
+      icon: ICONS.STACK,
+      hideForUnauth: true,
+    });
   }
-
   if (!SIMPLE_SITE) {
     SIDE_LINKS.push(...FULL_LINKS);
+  } else if (SIMPLE_SITE) {
+    SIDE_LINKS.push({
+      title: 'Lists',
+      link: `/$/${PAGES.LISTS}`,
+      icon: ICONS.STACK,
+      hideForUnauth: true,
+    });
+  }
+
+  if (SIMPLE_SITE && EXTRA_SIDEBAR_LINKS) {
+    // $FlowFixMe
+    SIDE_LINKS.push(...EXTRA_SIDEBAR_LINKS);
+
+    const WILD_WEST = {
+      title: 'Wild West',
+      link: `/$/${PAGES.WILD_WEST}`,
+      icon: ICONS.WILD_WEST,
+    };
+
+    SIDE_LINKS.push(WILD_WEST);
   }
 
   const [pulseLibrary, setPulseLibrary] = React.useState(false);
@@ -232,7 +241,7 @@ function SideNavigation(props: Props) {
   const isAbsolute = isOnFilePage || isMediumScreen;
   const microNavigation = !sidebarOpen || isMediumScreen;
   const subLinks = email
-    ? MOBILE_LINKS.filter(link => {
+    ? MOBILE_LINKS.filter((link) => {
         if (!notificationsEnabled && link.icon === ICONS.NOTIFICATION) {
           return false;
         }
@@ -259,7 +268,7 @@ function SideNavigation(props: Props) {
       if (e.keyCode === ESCAPE_KEY_CODE && isAbsolute) {
         setSidebarOpen(false);
       } else if (e.keyCode === BACKSLASH_KEY_CODE) {
-        const hasActiveInput = document.querySelector('input:focus');
+        const hasActiveInput = document.querySelector('input:focus, textarea:focus');
         if (!hasActiveInput) {
           setSidebarOpen(!sidebarOpen);
         }
@@ -271,16 +280,22 @@ function SideNavigation(props: Props) {
     return () => window.removeEventListener('keydown', handleKeydown);
   }, [sidebarOpen, setSidebarOpen, isAbsolute]);
 
-  const unAuthNudge = (
-    <div className="navigation__auth-nudge">
-      <span>
-        <I18nMessage tokens={{ lbc: <Icon icon={ICONS.LBC} /> }}>
-          Sign up to earn %lbc% for you and your favorite creators.
-        </I18nMessage>
-      </span>
-      <Button button="secondary" label={__('Sign Up')} navigate={`/$/${PAGES.AUTH}?src=sidenav_nudge`} />
-    </div>
-  );
+  const unAuthNudge =
+    DOMAIN === 'lbry.tv' ? null : (
+      <div className="navigation__auth-nudge">
+        <span>
+          <I18nMessage tokens={{ lbc: <Icon icon={ICONS.LBC} /> }}>
+            Sign up to earn %lbc% for you and your favorite creators.
+          </I18nMessage>
+        </span>
+        <Button
+          button="secondary"
+          label={__('Sign Up')}
+          navigate={`/$/${PAGES.AUTH}?src=sidenav_nudge`}
+          disabled={user === null}
+        />{' '}
+      </div>
+    );
 
   const helpLinks = (
     <ul className="navigation__tertiary navigation-links--small">
@@ -291,7 +306,7 @@ function SideNavigation(props: Props) {
         <Button label={__('FAQ')} href="https://odysee.com/@OdyseeHelp:b" />
       </li>
       <li className="navigation-link">
-        <Button label={__('Support')} href="https://lbry.com/support" />
+        <Button label={__('Support --[used in footer; general help/support]--')} href="https://lbry.com/support" />
       </li>
       <li className="navigation-link">
         <Button label={__('Terms')} href="https://lbry.com/termsofservice" />
@@ -320,11 +335,11 @@ function SideNavigation(props: Props) {
         >
           <div>
             <ul className={classnames('navigation-links', { 'navigation-links--micro': !sidebarOpen })}>
-              {SIDE_LINKS.map(linkProps => {
+              {SIDE_LINKS.map((linkProps) => {
                 //   $FlowFixMe
                 const { hideForUnauth, ...passedProps } = linkProps;
                 return !email && linkProps.hideForUnauth && IS_WEB ? null : (
-                  <li key={linkProps.icon}>
+                  <li key={linkProps.route || linkProps.link}>
                     <Button
                       {...passedProps}
                       label={__(linkProps.title)}
@@ -334,7 +349,7 @@ function SideNavigation(props: Props) {
                       icon={pulseLibrary && linkProps.icon === ICONS.LIBRARY ? ICONS.PURCHASED : linkProps.icon}
                       className={classnames('navigation-link', {
                         'navigation-link--pulse': linkProps.icon === ICONS.LIBRARY && pulseLibrary,
-                        'navigation-link--highlighted': linkProps.icon === ICONS.NOTIFICATION && unreadCount > 0,
+                        'navigation-link--highlighted': linkProps.icon === ICONS.NOTIFICATION && unseenCount > 0,
                       })}
                       activeClass="navigation-link--active"
                     />
@@ -346,19 +361,12 @@ function SideNavigation(props: Props) {
 
             {sidebarOpen && isPersonalized && subscriptions && subscriptions.length > 0 && (
               <ul className="navigation__secondary navigation-links">
-                {subscriptions.map(({ uri, channelName }, index) => (
-                  <li key={uri} className="navigation-link__wrapper">
-                    <Button
-                      navigate={uri}
-                      label={channelName}
-                      className="navigation-link"
-                      activeClass="navigation-link--active"
-                    />
-                  </li>
+                {subscriptions.map((subscription) => (
+                  <SubscriptionListItem key={subscription.uri} subscription={subscription} />
                 ))}
               </ul>
             )}
-            {!SIMPLE_SITE && sidebarOpen && isPersonalized && followedTags && followedTags.length > 0 && (
+            {sidebarOpen && isPersonalized && followedTags && followedTags.length > 0 && (
               <ul className="navigation__secondary navigation-links navigation-links--small">
                 {followedTags.map(({ name }, key) => (
                   <li key={name} className="navigation-link__wrapper">
@@ -386,11 +394,11 @@ function SideNavigation(props: Props) {
           >
             <div>
               <ul className="navigation-links--absolute">
-                {SIDE_LINKS.map(linkProps => {
+                {SIDE_LINKS.map((linkProps) => {
                   //   $FlowFixMe
                   const { hideForUnauth, link, route, ...passedProps } = linkProps;
                   return !email && linkProps.hideForUnauth && IS_WEB ? null : (
-                    <li key={linkProps.icon}>
+                    <li key={route || link}>
                       <Button
                         {...passedProps}
                         navigate={route || link}
@@ -399,7 +407,7 @@ function SideNavigation(props: Props) {
                         icon={pulseLibrary && linkProps.icon === ICONS.LIBRARY ? ICONS.PURCHASED : linkProps.icon}
                         className={classnames('navigation-link', {
                           'navigation-link--pulse': linkProps.icon === ICONS.LIBRARY && pulseLibrary,
-                          'navigation-link--highlighted': linkProps.icon === ICONS.NOTIFICATION && unreadCount > 0,
+                          'navigation-link--highlighted': linkProps.icon === ICONS.NOTIFICATION && unseenCount > 0,
                         })}
                         activeClass="navigation-link--active"
                       />
@@ -409,11 +417,11 @@ function SideNavigation(props: Props) {
                 })}
               </ul>
               <ul className="navigation-links--absolute mobile-only">
-                {subLinks.map(linkProps => {
+                {subLinks.map((linkProps) => {
                   const { hideForUnauth, ...passedProps } = linkProps;
 
                   return !email && hideForUnauth && IS_WEB ? null : (
-                    <li key={linkProps.icon} className="mobile-only">
+                    <li key={linkProps.title} className="mobile-only">
                       <Button
                         {...passedProps}
                         navigate={linkProps.link}
@@ -429,19 +437,12 @@ function SideNavigation(props: Props) {
               </ul>
               {sidebarOpen && isPersonalized && subscriptions && subscriptions.length > 0 && (
                 <ul className="navigation__secondary navigation-links">
-                  {subscriptions.map(({ uri, channelName }, index) => (
-                    <li key={uri} className="navigation-link__wrapper">
-                      <Button
-                        navigate={uri}
-                        label={channelName}
-                        className="navigation-link"
-                        activeClass="navigation-link--active"
-                      />
-                    </li>
+                  {subscriptions.map((subscription) => (
+                    <SubscriptionListItem key={subscription.uri} subscription={subscription} />
                   ))}
                 </ul>
               )}
-              {!SIMPLE_SITE && sidebarOpen && isPersonalized && followedTags && followedTags.length > 0 && (
+              {sidebarOpen && isPersonalized && followedTags && followedTags.length > 0 && (
                 <ul className="navigation__secondary navigation-links navigation-links--small">
                   {followedTags.map(({ name }, key) => (
                     <li key={name} className="navigation-link__wrapper">
@@ -465,6 +466,24 @@ function SideNavigation(props: Props) {
         </>
       )}
     </div>
+  );
+}
+
+function SubscriptionListItem({ subscription }: { subscription: Subscription }) {
+  const { uri, channelName } = subscription;
+  return (
+    <li className="navigation-link__wrapper">
+      <Button
+        navigate={uri}
+        className="navigation-link navigation-link--with-thumbnail"
+        activeClass="navigation-link--active"
+      >
+        <ChannelThumbnail xsmall uri={uri} hideStakedIndicator />
+        <span dir="auto" className="button__label">
+          {channelName}
+        </span>
+      </Button>
+    </li>
   );
 }
 

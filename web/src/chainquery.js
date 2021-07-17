@@ -9,7 +9,7 @@ const pool = mysql.createPool({
 });
 
 function queryPool(sql, params) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     pool.query(sql, params, (error, rows) => {
       if (error) {
         console.log('error', error); // eslint-disable-line
@@ -31,16 +31,17 @@ module.exports.getClaim = async function getClaim(claimName, claimId, channelNam
     'FROM claim ' +
     'LEFT JOIN claim channel_claim on claim.publisher_id = channel_claim.claim_id ' +
     'LEFT JOIN claim as reposted_claim on reposted_claim.claim_id = claim.claim_reference ' +
-    'AND (reposted_claim.bid_state="controlling" OR reposted_claim.bid_state="active")' +
+    'AND (reposted_claim.bid_state in ("controlling", "active", "accepted", "spent")) ' +
     'LEFT JOIN claim as repost_channel on repost_channel.claim_id = reposted_claim.publisher_id ' +
     'WHERE claim.name = ?';
 
   if (claimId) {
     sql += ' AND claim.claim_id LIKE ?';
     params.push(claimId + '%');
+    sql += ' AND claim.bid_state in ("controlling", "active", "accepted", "spent")';
+  } else {
+    sql += ' AND claim.bid_state in ("controlling", "active", "accepted")';
   }
-
-  sql += ' AND claim.bid_state in ("controlling", "active", "accepted")';
 
   if (claimName[0] !== '@' && channelName) {
     sql += ' AND channel_claim.name = ?';
@@ -49,7 +50,7 @@ module.exports.getClaim = async function getClaim(claimName, claimId, channelNam
       sql += ' AND channel_claim.claim_id LIKE ?';
       params.push(channelClaimId + '%');
     } else {
-      sql += ' AND channel_claim.bid_state in ("controlling", "active", "accepted")';
+      sql += ' AND channel_claim.bid_state in ("controlling", "active", "accepted", "spent")';
     }
   }
 

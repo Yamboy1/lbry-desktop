@@ -1,53 +1,44 @@
 import { connect } from 'react-redux';
 import {
-  doResolveUri,
-  makeSelectClaimIsPending,
+  makeSelectStakedLevelForChannelUri,
   makeSelectClaimForUri,
   makeSelectThumbnailForUri,
-  makeSelectIsUriResolving,
   selectMyChannelClaims,
-  makeSelectMyChannelPermUrlForName,
-  makeSelectChannelPermUrlForClaimUri,
 } from 'lbry-redux';
-import { doCommentAbandon, doCommentUpdate, doCommentPin, doCommentList } from 'redux/actions/comments';
-import { doToggleBlockChannel } from 'redux/actions/blocked';
-import { selectChannelIsBlocked } from 'redux/selectors/blocked';
+import { doCommentUpdate, doCommentList } from 'redux/actions/comments';
+import { makeSelectChannelIsMuted } from 'redux/selectors/blocked';
 import { doToast } from 'redux/actions/notifications';
+import { doSetPlayingUri } from 'redux/actions/content';
 import { selectUserVerifiedEmail } from 'redux/selectors/user';
-import {
-  selectIsFetchingComments,
-  makeSelectOthersReactionsForComment,
-  selectCommentChannel,
-} from 'redux/selectors/comments';
+import { selectLinkedCommentAncestors, makeSelectOthersReactionsForComment } from 'redux/selectors/comments';
+import { selectActiveChannelId, selectActiveChannelClaim } from 'redux/selectors/app';
+import { selectPlayingUri } from 'redux/selectors/content';
 import Comment from './view';
 
 const select = (state, props) => {
-  const channel = selectCommentChannel(state);
+  const activeChannelId = selectActiveChannelId(state);
+  const reactionKey = activeChannelId ? `${props.commentId}:${activeChannelId}` : props.commentId;
 
   return {
-    activeChannel: channel,
-    pending: props.authorUri && makeSelectClaimIsPending(props.authorUri)(state),
-    channel: props.authorUri && makeSelectClaimForUri(props.authorUri)(state),
-    isResolvingUri: props.authorUri && makeSelectIsUriResolving(props.authorUri)(state),
+    claim: makeSelectClaimForUri(props.uri)(state),
     thumbnail: props.authorUri && makeSelectThumbnailForUri(props.authorUri)(state),
-    channelIsBlocked: props.authorUri && selectChannelIsBlocked(props.authorUri)(state),
+    channelIsBlocked: props.authorUri && makeSelectChannelIsMuted(props.authorUri)(state),
     commentingEnabled: IS_WEB ? Boolean(selectUserVerifiedEmail(state)) : true,
-    isFetchingComments: selectIsFetchingComments(state),
+    othersReacts: makeSelectOthersReactionsForComment(reactionKey)(state),
+    activeChannelClaim: selectActiveChannelClaim(state),
     myChannels: selectMyChannelClaims(state),
-    othersReacts: makeSelectOthersReactionsForComment(props.commentId)(state),
-    commentIdentityChannel: makeSelectMyChannelPermUrlForName(channel)(state),
-    contentChannel: makeSelectChannelPermUrlForClaimUri(props.uri)(state),
+    playingUri: selectPlayingUri(state),
+    stakedLevel: makeSelectStakedLevelForChannelUri(props.authorUri)(state),
+    linkedCommentAncestors: selectLinkedCommentAncestors(state),
   };
 };
 
-const perform = dispatch => ({
-  resolveUri: uri => dispatch(doResolveUri(uri)),
+const perform = (dispatch) => ({
+  clearPlayingUri: () => dispatch(doSetPlayingUri({ uri: null })),
   updateComment: (commentId, comment) => dispatch(doCommentUpdate(commentId, comment)),
-  deleteComment: commentId => dispatch(doCommentAbandon(commentId)),
-  blockChannel: channelUri => dispatch(doToggleBlockChannel(channelUri)),
-  doToast: options => dispatch(doToast(options)),
-  pinComment: (commentId, remove) => dispatch(doCommentPin(commentId, remove)),
-  fetchComments: uri => dispatch(doCommentList(uri)),
+  fetchReplies: (uri, parentId, page, pageSize, sortBy) =>
+    dispatch(doCommentList(uri, parentId, page, pageSize, sortBy)),
+  doToast: (options) => dispatch(doToast(options)),
 });
 
 export default connect(select, perform)(Comment);

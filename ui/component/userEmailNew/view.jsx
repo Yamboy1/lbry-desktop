@@ -1,6 +1,6 @@
 // @flow
 import * as PAGES from 'constants/pages';
-import { SITE_NAME } from 'config';
+import { DOMAIN, SIMPLE_SITE } from 'config';
 import React, { useState } from 'react';
 import { FormField, Form } from 'component/common/form';
 import Button from 'component/button';
@@ -11,20 +11,25 @@ import { useHistory } from 'react-router-dom';
 import Card from 'component/common/card';
 import ErrorText from 'component/common/error-text';
 import Nag from 'component/common/nag';
+import classnames from 'classnames';
+import OdyseeLogoWithWhiteText from 'component/header/odysee_white.png';
+import OdyseeLogoWithText from 'component/header/odysee.png';
+import LoginGraphic from 'component/loginGraphic';
 
 type Props = {
   errorMessage: ?string,
   emailExists: boolean,
   isPending: boolean,
   syncEnabled: boolean,
-  setSync: boolean => void,
+  setSync: (boolean) => void,
   balance: number,
   daemonSettings: { share_usage_data: boolean },
-  setShareDiagnosticData: boolean => void,
+  setShareDiagnosticData: (boolean) => void,
   doSignUp: (string, ?string) => Promise<any>,
   clearEmailEntry: () => void,
   interestedInYoutubSync: boolean,
   doToggleInterestedInYoutubeSync: () => void,
+  currentTheme: string,
 };
 
 function UserEmailNew(props: Props) {
@@ -39,6 +44,7 @@ function UserEmailNew(props: Props) {
     emailExists,
     interestedInYoutubSync,
     doToggleInterestedInYoutubeSync,
+    currentTheme,
   } = props;
   const { share_usage_data: shareUsageData } = daemonSettings;
   const { push, location } = useHistory();
@@ -91,14 +97,18 @@ function UserEmailNew(props: Props) {
   }, [emailExists]);
 
   return (
-    <div className="main__sign-up">
+    <div
+      className={classnames('main__sign-up', {
+        'main__sign-up--graphic': SIMPLE_SITE,
+      })}
+    >
       <Card
-        title={__('Join %SITE_NAME%', { SITE_NAME })}
+        title={__('Join')}
         // @if TARGET='app'
-        subtitle={__('An account with lbry.tv allows you to earn rewards and backup your data.')}
+        subtitle={__('An account allows you to earn rewards and backup your data.')}
         // @endif
         actions={
-          <div>
+          <div className={classnames({ 'card--disabled': DOMAIN === 'lbry.tv' && IS_WEB })}>
             <Form onSubmit={handleSubmit} className="section">
               <FormField
                 autoFocus
@@ -107,14 +117,14 @@ function UserEmailNew(props: Props) {
                 name="sign_up_email"
                 label={__('Email')}
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
               />
               <FormField
                 type="password"
                 name="sign_in_password"
                 label={__('Password')}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
               />
 
               {/* @if TARGET='web' */}
@@ -180,8 +190,39 @@ function UserEmailNew(props: Props) {
             </Form>
           </div>
         }
-        nag={errorMessage && <Nag type="error" relative message={<ErrorText>{errorMessage}</ErrorText>} />}
+        nag={
+          <>
+            {IS_WEB && DOMAIN === 'lbry.tv' && (
+              <Nag
+                relative
+                message={
+                  <I18nMessage
+                    tokens={{
+                      odysee: (
+                        <Button button="link" label={__('odysee.com')} href="https://odysee.com?src=lbrytv-retired" />
+                      ),
+                    }}
+                  >
+                    {__(
+                      'lbry.tv is being retired in favor of %odysee% and new sign ups are disabled. Sign up on %odysee% instead'
+                    )}
+                  </I18nMessage>
+                }
+              />
+            )}
+            {errorMessage && <Nag type="error" relative message={<ErrorText>{errorMessage}</ErrorText>} />}
+          </>
+        }
+        secondPane={SIMPLE_SITE && <LoginGraphic />}
       />
+
+      {IS_WEB && DOMAIN === 'lbry.tv' && (
+        <div className="signup__odysee-logo">
+          <Button href="https://odysee.com?src=lbrytv-retired">
+            <img src={currentTheme === 'light' ? OdyseeLogoWithText : OdyseeLogoWithWhiteText} />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

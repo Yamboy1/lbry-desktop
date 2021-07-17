@@ -5,33 +5,48 @@
   .card + .file-render,
   .card + .file-page__video-container,
   .card + .content__cover {
-    margin-top: var(--spacing-l);
+    margin-top: var(--spacing-m);
   }
 
   .card + .file-render {
-    margin-top: var(--spacing-l);
+    margin-top: var(--spacing-m);
   }
 
   .file-page__md {
-    .card {
-      border-bottom-left-radius: 0;
-      border-bottom-right-radius: 0;
+    .file-viewer--document {
+      margin-top: var(--spacing-l);
 
-      &:first-child {
-        margin-bottom: 0;
+      @media (min-width: $breakpoint-small) {
+        margin-top: var(--spacing-xl);
+      }
+
+      .button {
+        display: inline;
+
+        .button__content {
+          display: inline;
+        }
+      }
+
+      .claim-link {
+        .button {
+          display: block;
+
+          .button__content {
+            display: block;
+          }
+        }
       }
     }
 
-    .card + .file-render {
-      margin-top: 0;
+    .media__actions {
+      justify-content: center;
+    }
 
-      .card {
-        border-top-left-radius: 0;
-        border-top-right-radius: 0;
-        border-bottom-left-radius: var(--border-radius);
-        border-bottom-right-radius: var(--border-radius);
-        border-top: none;
-      }
+    .file-page__secondary-content {
+      display: flex;
+      flex-direction: column;
+      padding: 0 var(--spacing-m);
     }
   }
 
@@ -53,6 +68,8 @@
 }
 
 .file-render--video {
+  background-color: black;
+
   &:after {
     content: '';
     position: absolute;
@@ -81,27 +98,6 @@
   border-radius: 0;
   position: fixed;
   max-height: none;
-}
-
-.file-render--document {
-  height: auto;
-  max-height: none;
-  overflow: auto;
-  margin-bottom: var(--spacing-l);
-
-  .markdown-preview {
-    height: 100%;
-    width: 40rem;
-    margin-left: auto;
-    margin-right: auto;
-    max-width: unset;
-    min-width: unset;
-
-    @media (max-width: $breakpoint-small) {
-      width: 100%;
-      padding: var(--spacing-s);
-    }
-  }
 }
 
 .file-render__header {
@@ -334,7 +330,7 @@
   }
 
   .CodeMirror-code {
-    @include font-mono;
+    @include font-sans;
     letter-spacing: 0.1rem;
   }
 
@@ -362,12 +358,6 @@
   width: 100%;
 }
 
-.video-js-parent--ios {
-  .vjs-control-bar {
-    display: none;
-  }
-}
-
 // By default no video js play button
 .vjs-big-play-button {
   display: none;
@@ -385,7 +375,7 @@
   }
 
   .vjs-control-bar {
-    background-color: #000000;
+    // background-color: rgba(0, 0, 0, 0.8);
 
     .vjs-remaining-time {
       display: none;
@@ -459,6 +449,42 @@
     &.skip {
       background-color: rgba(0, 0, 0, 0.5);
     }
+
+    // Override the original's 'display: block' to avoid the big play button
+    // from being squished to the side:
+    position: absolute;
+  }
+}
+
+video::-internal-media-controls-overlay-cast-button {
+  // Push the cast button above vjs-touch-overlay:
+  z-index: 3;
+
+  // Move it to the upper-right since it will clash with "tap to unmute":
+  left: unset;
+  right: 8px;
+}
+
+.video-js.video-js.vjs-user-inactive {
+  video::-internal-media-controls-overlay-cast-button {
+    // (1) Android-Chrome's original Cast button behavior:
+    // - If video is playing, fade out the button.
+    // - If video is paused and video is tapped, display the button and stay on.
+    // (2) We then injected another behavior:
+    // - Display the button when '.vjs-touch-overlay' is displayed. However,
+    // the 'controlslist' attribute hack that was used to do this results in the
+    // button staying displayed without a fade-out timer.
+    // (3) Ideally, we should sync the '.vjs-touch-overlay' visibility with the
+    // cast button, similar to how to controlBar's visibility is synced above.
+    // But I have no idea how to grab the sibling '.show-play-toggle' into the
+    // css logic.
+    // (4) So, this is the best that I can come up with: Whenever user is idle,
+    // the button goes away. The only downside I know is the scenario of
+    // "overlay is up and video is paused, but button goes away due to idle".
+    // The user just needs to re-tap any empty space on the overlay to get the
+    // Cast button again.
+    opacity: 0;
+    transition: opacity 1s ease;
   }
 }
 
@@ -471,7 +497,7 @@
   // --- Unhide desired components per layout ---
   &.vjs-layout-x-small {
     .vjs-playback-rate {
-      display: inherit;
+      display: flex !important;
     }
   }
 
@@ -480,7 +506,7 @@
     .vjs-time-divider,
     .vjs-duration,
     .vjs-playback-rate {
-      display: inherit;
+      display: flex !important;
     }
   }
 
@@ -503,6 +529,12 @@
     // Extend the width to prevent a potential scrollbar from blocking the text.
     width: 8em;
     left: -2em;
+  }
+}
+
+.video-js.vjs-fullscreen {
+  .vjs-button--theater-mode {
+    display: none;
   }
 }
 
@@ -539,21 +571,26 @@
 
 .file-render {
   .video-js {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    /*display: flex;*/
+    /*align-items: center;*/
+    /*justify-content: center;*/
   }
 
   .vjs-big-play-button {
     @extend .button--icon;
     @extend .button--play;
     border: none;
-    position: static;
+    /*position: static;*/
     z-index: 2;
 
     .vjs-icon-placeholder {
       display: none;
     }
+  }
+
+  .vjs-menu-item-text,
+  .vjs-icon-placeholder {
+    text-transform: capitalize;
   }
 }
 
@@ -666,14 +703,26 @@
 .file__viewdate {
   display: flex;
   justify-content: space-between;
+  flex-direction: column;
   margin-bottom: var(--spacing-s);
 
-  @media (min-width: $breakpoint-small) {
-    flex-direction: column;
-    margin-bottom: 0;
+  > :first-child {
+    margin-bottom: var(--spacing-s);
+  }
+
+  @media (max-width: $breakpoint-medium) {
+    flex-direction: row;
+    justify-content: start;
 
     > :first-child {
-      margin-bottom: var(--spacing-s);
+      margin-bottom: 0;
+      margin-right: 1rem;
     }
+  }
+}
+
+.file-page__image {
+  img {
+    cursor: pointer;
   }
 }

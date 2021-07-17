@@ -19,6 +19,10 @@ import * as PAGES from 'constants/pages';
 import analytics from 'analytics';
 import LbcSymbol from 'component/common/lbc-symbol';
 import SUPPORTED_LANGUAGES from 'constants/supported_languages';
+import WalletSpendableBalanceHelp from 'component/walletSpendableBalanceHelp';
+import { SIMPLE_SITE } from 'config';
+import { sortLanguageMap } from 'util/default-languages';
+
 const LANG_NONE = 'none';
 
 const MAX_TAG_SELECT = 5;
@@ -37,17 +41,17 @@ type Props = {
   tags: Array<string>,
   locations: Array<string>,
   languages: Array<string>,
-  updateChannel: any => Promise<any>,
+  updateChannel: (any) => Promise<any>,
   updatingChannel: boolean,
   updateError: string,
-  createChannel: any => Promise<any>,
+  createChannel: (any) => Promise<any>,
   createError: string,
   creatingChannel: boolean,
   clearChannelErrors: () => void,
   onDone: () => void,
   openModal: (
     id: string,
-    { onUpdate: string => void, assetName: string, helpText: string, currentValue: string, title: string }
+    { onUpdate: (string) => void, assetName: string, helpText: string, currentValue: string, title: string }
   ) => void,
   uri: string,
   disabled: boolean,
@@ -116,7 +120,7 @@ function ChannelForm(props: Props) {
       languages: languages || [],
       locations: locations || [],
       tags: tags
-        ? tags.map(tag => {
+        ? tags.map((tag) => {
             return { name: tag };
           })
         : [],
@@ -138,7 +142,9 @@ function ChannelForm(props: Props) {
     if (bid <= 0.0 || isNaN(bid)) {
       setBidError(__('Deposit cannot be 0'));
     } else if (totalAvailableBidAmount < bid) {
-      setBidError(__('Deposit cannot be higher than your balance'));
+      setBidError(
+        __('Deposit cannot be higher than your available balance: %balance%', { balance: totalAvailableBidAmount })
+      );
     } else if (totalAvailableBidAmount - bid < ESTIMATED_FEE) {
       setBidError(__('Please decrease your deposit to account for transaction fees'));
     } else if (bid < MINIMUM_PUBLISH_BID) {
@@ -177,19 +183,25 @@ function ChannelForm(props: Props) {
 
   function handleSubmit() {
     if (uri) {
-      updateChannel(params).then(success => {
+      updateChannel(params).then((success) => {
         if (success) {
           onDone();
         }
       });
     } else {
-      createChannel(params).then(success => {
+      createChannel(params).then((success) => {
         if (success) {
           analytics.apiLogPublish(success);
           onDone();
         }
       });
     }
+  }
+
+  const LIMIT_ERR_PARTIAL_MSG = 'bad-txns-claimscriptsize-toolarge (code 16)';
+  let errorMsg = updateError || createError;
+  if (errorMsg && errorMsg.includes(LIMIT_ERR_PARTIAL_MSG)) {
+    errorMsg = __('Transaction limit reached. Try reducing the Description length.');
   }
 
   React.useEffect(() => {
@@ -218,7 +230,7 @@ function ChannelForm(props: Props) {
               title={__('Cover')}
               onClick={() =>
                 openModal(MODALS.IMAGE_UPLOAD, {
-                  onUpdate: coverUrl => handleCoverChange(coverUrl),
+                  onUpdate: (coverUrl) => handleCoverChange(coverUrl),
                   title: __('Edit Cover Image'),
                   helpText: __('(6.25:1)'),
                   assetName: __('Cover Image'),
@@ -242,7 +254,7 @@ function ChannelForm(props: Props) {
                 title={__('Edit')}
                 onClick={() =>
                   openModal(MODALS.IMAGE_UPLOAD, {
-                    onUpdate: v => handleThumbnailChange(v),
+                    onUpdate: (v) => handleThumbnailChange(v),
                     title: __('Edit Thumbnail Image'),
                     helpText: __('(1:1)'),
                     assetName: __('Thumbnail'),
@@ -293,7 +305,7 @@ function ChannelForm(props: Props) {
                         value={params.name || channelName}
                         error={nameError}
                         disabled={!isNewChannel}
-                        onChange={e => setParams({ ...params, name: e.target.value })}
+                        onChange={(e) => setParams({ ...params, name: e.target.value })}
                       />
                     </fieldset-group>
                     {!isNewChannel && <span className="form-field__help">{__('This field cannot be changed.')}</span>}
@@ -304,7 +316,7 @@ function ChannelForm(props: Props) {
                       label={__('Title')}
                       placeholder={__('My Awesome Channel')}
                       value={params.title}
-                      onChange={e => setParams({ ...params, title: e.target.value })}
+                      onChange={(e) => setParams({ ...params, title: e.target.value })}
                     />
                     <FormField
                       type="markdown"
@@ -312,7 +324,7 @@ function ChannelForm(props: Props) {
                       label={__('Description')}
                       placeholder={__('Description of your content')}
                       value={params.description}
-                      onChange={text => setParams({ ...params, description: text })}
+                      onChange={(text) => setParams({ ...params, description: text })}
                       textAreaMaxLength={FF_MAX_CHARS_IN_DESCRIPTION}
                     />
                   </>
@@ -332,9 +344,14 @@ function ChannelForm(props: Props) {
                     error={bidError}
                     min="0.0"
                     disabled={false}
-                    onChange={event => handleBidChange(parseFloat(event.target.value))}
+                    onChange={(event) => handleBidChange(parseFloat(event.target.value))}
                     placeholder={0.1}
-                    helper={__('Increasing your deposit can help your channel be discovered more easily.')}
+                    helper={
+                      <>
+                        {__('Increasing your deposit can help your channel be discovered more easily.')}
+                        <WalletSpendableBalanceHelp inline />
+                      </>
+                    }
                   />
                 }
               />
@@ -343,22 +360,23 @@ function ChannelForm(props: Props) {
               <Card
                 body={
                   <TagsSearch
-                    suggestMature
+                    suggestMature={!SIMPLE_SITE}
                     disableAutoFocus
+                    disableControlTags
                     limitSelect={MAX_TAG_SELECT}
                     tagsPassedIn={params.tags || []}
                     label={__('Selected Tags')}
-                    onRemove={clickedTag => {
-                      const newTags = params.tags.slice().filter(tag => tag.name !== clickedTag.name);
+                    onRemove={(clickedTag) => {
+                      const newTags = params.tags.slice().filter((tag) => tag.name !== clickedTag.name);
                       setParams({ ...params, tags: newTags });
                     }}
-                    onSelect={newTags => {
-                      newTags.forEach(newTag => {
-                        if (!params.tags.map(savedTag => savedTag.name).includes(newTag.name)) {
+                    onSelect={(newTags) => {
+                      newTags.forEach((newTag) => {
+                        if (!params.tags.map((savedTag) => savedTag.name).includes(newTag.name)) {
                           setParams({ ...params, tags: [...params.tags, newTag] });
                         } else {
                           // If it already exists and the user types it in, remove it
-                          setParams({ ...params, tags: params.tags.filter(tag => tag.name !== newTag.name) });
+                          setParams({ ...params, tags: params.tags.filter((tag) => tag.name !== newTag.name) });
                         }
                       });
                     }}
@@ -377,7 +395,7 @@ function ChannelForm(props: Props) {
                       placeholder={__('aprettygoodsite.com')}
                       disabled={false}
                       value={params.website}
-                      onChange={e => setParams({ ...params, website: e.target.value })}
+                      onChange={(e) => setParams({ ...params, website: e.target.value })}
                     />
                     <FormField
                       type="text"
@@ -386,22 +404,22 @@ function ChannelForm(props: Props) {
                       placeholder={__('yourstruly@example.com')}
                       disabled={false}
                       value={params.email}
-                      onChange={e => setParams({ ...params, email: e.target.value })}
+                      onChange={(e) => setParams({ ...params, email: e.target.value })}
                     />
                     <FormField
                       name="language_select"
                       type="select"
                       label={__('Primary Language')}
-                      onChange={event => handleLanguageChange(0, event.target.value)}
+                      onChange={(event) => handleLanguageChange(0, event.target.value)}
                       value={primaryLanguage}
                       helper={__('Your main content language')}
                     >
                       <option key={'pri-langNone'} value={LANG_NONE}>
                         {__('None selected')}
                       </option>
-                      {Object.keys(SUPPORTED_LANGUAGES).map(language => (
-                        <option key={language} value={language}>
-                          {SUPPORTED_LANGUAGES[language]}
+                      {sortLanguageMap(SUPPORTED_LANGUAGES).map(([langKey, langName]) => (
+                        <option key={langKey} value={langKey}>
+                          {langName}
                         </option>
                       ))}
                     </FormField>
@@ -409,7 +427,7 @@ function ChannelForm(props: Props) {
                       name="language_select2"
                       type="select"
                       label={__('Secondary Language')}
-                      onChange={event => handleLanguageChange(1, event.target.value)}
+                      onChange={(event) => handleLanguageChange(1, event.target.value)}
                       value={secondaryLanguage}
                       disabled={!languageParam[0]}
                       helper={__('Your other content language')}
@@ -417,13 +435,11 @@ function ChannelForm(props: Props) {
                       <option key={'sec-langNone'} value={LANG_NONE}>
                         {__('None selected')}
                       </option>
-                      {Object.keys(SUPPORTED_LANGUAGES)
-                        .filter(lang => lang !== languageParam[0])
-                        .map(language => (
-                          <option key={language} value={language}>
-                            {SUPPORTED_LANGUAGES[language]}
-                          </option>
-                        ))}
+                      {sortLanguageMap(SUPPORTED_LANGUAGES).map(([langKey, langName]) => (
+                        <option key={langKey} value={langKey} disabled={langKey === languageParam[0]}>
+                          {langName}
+                        </option>
+                      ))}
                     </FormField>
                   </>
                 }
@@ -447,8 +463,8 @@ function ChannelForm(props: Props) {
                 />
                 <Button button="link" label={__('Cancel')} onClick={onDone} />
               </div>
-              {updateError || createError ? (
-                <ErrorText>{updateError || createError}</ErrorText>
+              {errorMsg ? (
+                <ErrorText>{errorMsg}</ErrorText>
               ) : (
                 <p className="help">
                   {__('After submitting, it will take a few minutes for your changes to be live for everyone.')}

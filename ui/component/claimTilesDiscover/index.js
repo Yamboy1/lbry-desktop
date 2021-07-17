@@ -1,16 +1,25 @@
 import { connect } from 'react-redux';
-import { doClaimSearch, selectClaimSearchByQuery, selectFetchingClaimSearchByQuery, SETTINGS } from 'lbry-redux';
-import { selectBlockedChannels } from 'redux/selectors/blocked';
+import {
+  doClaimSearch,
+  selectClaimSearchByQuery,
+  selectFetchingClaimSearchByQuery,
+  SETTINGS,
+  selectClaimsByUri,
+} from 'lbry-redux';
 import { doToggleTagFollowDesktop } from 'redux/actions/tags';
-import { makeSelectClientSetting } from 'redux/selectors/settings';
+import { makeSelectClientSetting, selectShowMatureContent } from 'redux/selectors/settings';
+import { selectModerationBlockList } from 'redux/selectors/comments';
+import { selectMutedChannels } from 'redux/selectors/blocked';
 import ClaimListDiscover from './view';
 
-const select = state => ({
+const select = (state) => ({
   claimSearchByQuery: selectClaimSearchByQuery(state),
+  claimsByUri: selectClaimsByUri(state),
   fetchingClaimSearchByQuery: selectFetchingClaimSearchByQuery(state),
-  showNsfw: makeSelectClientSetting(SETTINGS.SHOW_MATURE)(state),
+  showNsfw: selectShowMatureContent(state),
   hideReposts: makeSelectClientSetting(SETTINGS.HIDE_REPOSTS)(state),
-  hiddenUris: selectBlockedChannels(state),
+  mutedUris: selectMutedChannels(state),
+  blockedUris: selectModerationBlockList(state),
 });
 
 const perform = {

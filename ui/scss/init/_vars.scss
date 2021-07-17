@@ -2,6 +2,7 @@
 $spacing-vertical: 2rem;
 $spacing-width: 36px;
 
+$breakpoint-xxsmall: 450px;
 $breakpoint-xsmall: 600px;
 $breakpoint-small: 900px;
 $breakpoint-medium: 1150px;
@@ -96,6 +97,8 @@ $breakpoint-large: 1600px;
   --file-list-thumbnail-width: 10rem;
 
   --tag-height: 1.5rem;
+
+  --livestream-comments-width: 30rem;
 }
 
 @media (max-width: $breakpoint-small) {

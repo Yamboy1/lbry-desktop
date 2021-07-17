@@ -1,4 +1,3 @@
-// @flow
 import * as PAGES from 'constants/pages';
 import React from 'react';
 import Button from 'component/button';
@@ -80,23 +79,24 @@ const sections = [
 export default function Footer() {
   return (
     <footer className="footer">
-      {sections.map(({ name, links }) => {
-        return (
-          <div key={name} className="footer__section">
-            <div className="footer__section-title">{name}</div>
-            <ul className="ul--no-style">
-              {/* $FlowFixMe */}
-              {links.map(({ label, link, navigate }) => {
-                return (
-                  <li key={label}>
-                    <Button className="footer__link" href={link} navigate={navigate} label={__(label)} />
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        );
-      })}
+      <ul className="navigation__tertiary footer__links ul--no-style">
+        {sections.map(({ name, links }) => {
+          return (
+            <li key={name} className="footer__section">
+              <ul className="ul--no-style">
+                <div className="footer__section-title">{__(name)}</div>
+                {links.map(({ label, link, navigate }) => {
+                  return (
+                    <li key={label}>
+                      <Button className="footer__link" label={__(label)} href={link} navigate={navigate} />
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
     </footer>
   );
 }

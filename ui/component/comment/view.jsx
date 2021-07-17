@@ -1,17 +1,17 @@
 // @flow
 import * as ICONS from 'constants/icons';
 import * as PAGES from 'constants/pages';
+import { SORT_BY, COMMENT_PAGE_SIZE_REPLIES } from 'constants/comment';
 import { FF_MAX_CHARS_IN_COMMENT } from 'constants/form-field';
 import { SITE_NAME, SIMPLE_SITE, ENABLE_COMMENT_REACTIONS } from 'config';
 import React, { useEffect, useState } from 'react';
 import { parseURI } from 'lbry-redux';
-import { isEmpty } from 'util/object';
 import DateTime from 'component/dateTime';
 import Button from 'component/button';
 import Expandable from 'component/expandable';
 import MarkdownPreview from 'component/common/markdown-preview';
 import ChannelThumbnail from 'component/channelThumbnail';
-import { Menu, MenuList, MenuButton, MenuItem } from '@reach/menu-button';
+import { Menu, MenuButton } from '@reach/menu-button';
 import Icon from 'component/common/icon';
 import { FormField, Form } from 'component/common/form';
 import classnames from 'classnames';
@@ -20,25 +20,29 @@ import CommentReactions from 'component/commentReactions';
 import CommentsReplies from 'component/commentsReplies';
 import { useHistory } from 'react-router';
 import CommentCreate from 'component/commentCreate';
+import CommentMenuList from 'component/commentMenuList';
+import UriIndicator from 'component/uriIndicator';
+import CreditAmount from 'component/common/credit-amount';
+
+const AUTO_EXPAND_ALL_REPLIES = false;
 
 type Props = {
+  clearPlayingUri: () => void,
   uri: string,
+  claim: StreamClaim,
   author: ?string, // LBRY Channel Name, e.g. @channel
   authorUri: string, // full LBRY Channel URI: lbry://@channel#123...
   commentId: string, // sha256 digest identifying the comment
   message: string, // comment body
   timePosted: number, // Comment timestamp
-  channel: ?Claim, // Channel Claim, retrieved to obtain thumbnail
-  pending?: boolean,
-  resolveUri: string => void, // resolves the URI
-  isResolvingUri: boolean, // if the URI is currently being resolved
   channelIsBlocked: boolean, // if the channel is blacklisted in the app
   claimIsMine: boolean, // if you control the claim which this comment was posted on
   commentIsMine: boolean, // if this comment was signed by an owned channel
   updateComment: (string, string) => void,
-  deleteComment: string => void,
-  blockChannel: string => void,
-  linkedComment?: any,
+  fetchReplies: (string, string, number, number, number) => void,
+  commentModBlock: (string) => void,
+  linkedCommentId?: string,
+  linkedCommentAncestors: { [string]: Array<string> },
   myChannels: ?Array<ChannelClaim>,
   commentingEnabled: boolean,
   doToast: ({ message: string }) => void,
@@ -49,10 +53,12 @@ type Props = {
     like: number,
     dislike: number,
   },
-  pinComment: (string, boolean) => Promise<any>,
-  fetchComments: string => void,
   commentIdentityChannel: any,
-  contentChannel: any,
+  activeChannelClaim: ?ChannelClaim,
+  playingUri: ?PlayingUri,
+  stakedLevel: number,
+  supportAmount: number,
+  numDirectReplies: number,
 };
 
 const LENGTH_TO_COLLAPSE = 300;
@@ -60,45 +66,47 @@ const ESCAPE_KEY = 27;
 
 function Comment(props: Props) {
   const {
+    clearPlayingUri,
+    claim,
     uri,
     author,
     authorUri,
     timePosted,
     message,
-    pending,
-    channel,
-    isResolvingUri,
-    resolveUri,
     channelIsBlocked,
     commentIsMine,
     commentId,
     updateComment,
-    deleteComment,
-    blockChannel,
-    linkedComment,
+    fetchReplies,
+    linkedCommentId,
+    linkedCommentAncestors,
     commentingEnabled,
     myChannels,
     doToast,
     isTopLevel,
     threadDepth,
     isPinned,
-    pinComment,
-    fetchComments,
     othersReacts,
-    commentIdentityChannel,
-    contentChannel,
+    playingUri,
+    stakedLevel,
+    supportAmount,
+    numDirectReplies,
   } = props;
+
   const {
     push,
     replace,
     location: { pathname, search },
   } = useHistory();
+
   const [isReplying, setReplying] = React.useState(false);
   const [isEditing, setEditing] = useState(false);
   const [editedMessage, setCommentValue] = useState(message);
   const [charCount, setCharCount] = useState(editedMessage.length);
   // used for controlling the visibility of the menu icon
   const [mouseIsHovering, setMouseHover] = useState(false);
+  const [showReplies, setShowReplies] = useState(false);
+  const [page, setPage] = useState(0);
   const [advancedEditor] = usePersistedState('comment-editor-mode', false);
   const [displayDeadComment, setDisplayDeadComment] = React.useState(false);
   const hasChannels = myChannels && myChannels.length > 0;
@@ -106,10 +114,8 @@ function Comment(props: Props) {
   const dislikesCount = (othersReacts && othersReacts.dislike) || 0;
   const totalLikesAndDislikes = likesCount + dislikesCount;
   const slimedToDeath = totalLikesAndDislikes >= 5 && dislikesCount / totalLikesAndDislikes > 0.8;
-  // to debounce subsequent requests
-  const shouldFetch =
-    channel === undefined ||
-    (channel !== null && channel.value_type === 'channel' && isEmpty(channel.meta) && !pending);
+  const commentByOwnerOfContent = claim && claim.signing_channel && claim.signing_channel.permanent_url === authorUri;
+
   let channelOwnerOfContent;
   try {
     const { channelName } = parseURI(uri);
@@ -118,17 +124,25 @@ function Comment(props: Props) {
     }
   } catch (e) {}
 
+  // Auto-expand (limited to linked-comments for now, but can be for all)
   useEffect(() => {
-    // If author was extracted from the URI, then it must be valid.
-    if (authorUri && author && !isResolvingUri && shouldFetch) {
-      resolveUri(authorUri);
-    }
+    const isInLinkedCommentChain =
+      linkedCommentId &&
+      linkedCommentAncestors[linkedCommentId] &&
+      linkedCommentAncestors[linkedCommentId].includes(commentId);
 
+    if (isInLinkedCommentChain || AUTO_EXPAND_ALL_REPLIES) {
+      setShowReplies(true);
+      setPage(1);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (isEditing) {
       setCharCount(editedMessage.length);
 
       // a user will try and press the escape key to cancel editing their comment
-      const handleEscape = event => {
+      const handleEscape = (event) => {
         if (event.keyCode === ESCAPE_KEY) {
           setEditing(false);
         }
@@ -141,14 +155,23 @@ function Comment(props: Props) {
         window.removeEventListener('keydown', handleEscape);
       };
     }
-  }, [isResolvingUri, shouldFetch, author, authorUri, resolveUri, editedMessage, isEditing, setEditing]);
+  }, [author, authorUri, editedMessage, isEditing, setEditing]);
+
+  useEffect(() => {
+    if (page > 0) {
+      fetchReplies(uri, commentId, page, COMMENT_PAGE_SIZE_REPLIES, SORT_BY.OLDEST);
+    }
+  }, [page, uri, commentId, fetchReplies]);
 
   function handleEditMessageChanged(event) {
     setCommentValue(!SIMPLE_SITE && advancedEditor ? event : event.target.value);
   }
 
-  function handlePinComment(commentId, remove) {
-    pinComment(commentId, remove).then(() => fetchComments(uri));
+  function handleEditComment() {
+    if (playingUri && playingUri.source === 'comment') {
+      clearPlayingUri();
+    }
+    setEditing(true);
   }
 
   function handleSubmit() {
@@ -177,6 +200,7 @@ function Comment(props: Props) {
       className={classnames('comment', {
         'comment--top-level': isTopLevel,
         'comment--reply': !isTopLevel,
+        'comment--superchat': supportAmount > 0,
       })}
       id={commentId}
       onMouseOver={() => setMouseHover(true)}
@@ -184,28 +208,30 @@ function Comment(props: Props) {
     >
       <div
         className={classnames('comment__content', {
-          'comment--highlighted': linkedComment && linkedComment.comment_id === commentId,
+          'comment--highlighted': linkedCommentId && linkedCommentId === commentId,
           'comment--slimed': slimedToDeath && !displayDeadComment,
         })}
       >
         <div className="comment__thumbnail-wrapper">
           {authorUri ? (
-            <ChannelThumbnail uri={authorUri} obscure={channelIsBlocked} small className="comment__author-thumbnail" />
+            <ChannelThumbnail uri={authorUri} obscure={channelIsBlocked} xsmall className="comment__author-thumbnail" />
           ) : (
-            <ChannelThumbnail small className="comment__author-thumbnail" />
+            <ChannelThumbnail xsmall className="comment__author-thumbnail" />
           )}
         </div>
 
-        <div className="comment__body_container">
+        <div className="comment__body-container">
           <div className="comment__meta">
             <div className="comment__meta-information">
               {!author ? (
                 <span className="comment__author">{__('Anonymous')}</span>
               ) : (
-                <Button
-                  className="button--uri-indicator truncated-text comment__author"
-                  navigate={authorUri}
-                  label={author}
+                <UriIndicator
+                  className={classnames('comment__author', {
+                    'comment__author--creator': commentByOwnerOfContent,
+                  })}
+                  link
+                  uri={authorUri}
                 />
               )}
               <Button
@@ -213,6 +239,8 @@ function Comment(props: Props) {
                 onClick={handleTimeClick}
                 label={<DateTime date={timePosted} timeAgo />}
               />
+
+              {supportAmount > 0 && <CreditAmount amount={supportAmount} superChatLight size={12} />}
 
               {isPinned && (
                 <span className="comment__pin">
@@ -225,45 +253,22 @@ function Comment(props: Props) {
             </div>
             <div className="comment__menu">
               <Menu>
-                <MenuButton>
+                <MenuButton className="menu__button">
                   <Icon
                     size={18}
                     className={mouseIsHovering ? 'comment__menu-icon--hovering' : 'comment__menu-icon'}
                     icon={ICONS.MORE_VERTICAL}
                   />
                 </MenuButton>
-                <MenuList className="menu__list--comments">
-                  {commentIsMine ? (
-                    <>
-                      <MenuItem className="comment__menu-option menu__link" onSelect={() => setEditing(true)}>
-                        <Icon aria-hidden icon={ICONS.EDIT} />
-                        {__('Edit')}
-                      </MenuItem>
-                      <MenuItem className="comment__menu-option menu__link" onSelect={() => deleteComment(commentId)}>
-                        <Icon aria-hidden icon={ICONS.DELETE} />
-                        {__('Delete')}
-                      </MenuItem>
-                    </>
-                  ) : (
-                    <MenuItem className="comment__menu-option menu__link" onSelect={() => blockChannel(authorUri)}>
-                      <Icon aria-hidden icon={ICONS.NO} />
-                      {__('Block Channel')}
-                    </MenuItem>
-                  )}
-                  {commentIdentityChannel === contentChannel && isTopLevel && (
-                    <MenuItem
-                      className="comment__menu-option menu__link"
-                      onSelect={
-                        isPinned ? () => handlePinComment(commentId, true) : () => handlePinComment(commentId, false)
-                      }
-                    >
-                      <span className={'button__content'}>
-                        <Icon aria-hidden icon={ICONS.PIN} className={'icon'} />
-                        {isPinned ? __('Unpin') : __('Pin')}
-                      </span>
-                    </MenuItem>
-                  )}
-                </MenuList>
+                <CommentMenuList
+                  uri={uri}
+                  isTopLevel={isTopLevel}
+                  isPinned={isPinned}
+                  commentId={commentId}
+                  authorUri={authorUri}
+                  commentIsMine={commentIsMine}
+                  handleEditComment={handleEditComment}
+                />
               </Menu>
             </div>
           </div>
@@ -271,6 +276,7 @@ function Comment(props: Props) {
             {isEditing ? (
               <Form onSubmit={handleSubmit}>
                 <FormField
+                  className="comment__edit-input"
                   type={!SIMPLE_SITE && advancedEditor ? 'markdown' : 'textarea'}
                   name="editing_comment"
                   value={editedMessage}
@@ -278,7 +284,7 @@ function Comment(props: Props) {
                   onChange={handleEditMessageChanged}
                   textAreaMaxLength={FF_MAX_CHARS_IN_COMMENT}
                 />
-                <div className="section__actions">
+                <div className="section__actions section__actions--no-margin">
                   <Button
                     button="primary"
                     type="submit"
@@ -298,10 +304,20 @@ function Comment(props: Props) {
                     </div>
                   ) : editedMessage.length >= LENGTH_TO_COLLAPSE ? (
                     <Expandable>
-                      <MarkdownPreview content={message} promptLinks parentCommentId={commentId} />
+                      <MarkdownPreview
+                        content={message}
+                        promptLinks
+                        parentCommentId={commentId}
+                        stakedLevel={stakedLevel}
+                      />
                     </Expandable>
                   ) : (
-                    <MarkdownPreview content={message} promptLinks parentCommentId={commentId} />
+                    <MarkdownPreview
+                      content={message}
+                      promptLinks
+                      parentCommentId={commentId}
+                      stakedLevel={stakedLevel}
+                    />
                   )}
                 </div>
 
@@ -318,13 +334,43 @@ function Comment(props: Props) {
                   {ENABLE_COMMENT_REACTIONS && <CommentReactions uri={uri} commentId={commentId} />}
                 </div>
 
+                {numDirectReplies > 0 && !showReplies && (
+                  <div className="comment__actions">
+                    <Button
+                      label={
+                        numDirectReplies < 2
+                          ? __('Show reply')
+                          : __('Show %count% replies', { count: numDirectReplies })
+                      }
+                      button="link"
+                      onClick={() => {
+                        setShowReplies(true);
+                        if (page === 0) {
+                          setPage(1);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+
+                {numDirectReplies > 0 && showReplies && (
+                  <div className="comment__actions">
+                    <Button label={__('Hide replies')} button="link" onClick={() => setShowReplies(false)} />
+                  </div>
+                )}
+
                 {isReplying && (
                   <CommentCreate
                     isReply
                     uri={uri}
                     parentId={commentId}
-                    onDoneReplying={() => setReplying(false)}
-                    onCancelReplying={() => setReplying(false)}
+                    onDoneReplying={() => {
+                      setShowReplies(true);
+                      setReplying(false);
+                    }}
+                    onCancelReplying={() => {
+                      setReplying(false);
+                    }}
                   />
                 )}
               </>
@@ -333,7 +379,16 @@ function Comment(props: Props) {
         </div>
       </div>
 
-      <CommentsReplies threadDepth={threadDepth - 1} uri={uri} parentId={commentId} linkedComment={linkedComment} />
+      {showReplies && (
+        <CommentsReplies
+          threadDepth={threadDepth - 1}
+          uri={uri}
+          parentId={commentId}
+          linkedCommentId={linkedCommentId}
+          numDirectReplies={numDirectReplies}
+          onShowMore={() => setPage(page + 1)}
+        />
+      )}
     </li>
   );
 }

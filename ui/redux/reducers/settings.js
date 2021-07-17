@@ -2,6 +2,7 @@ import * as ACTIONS from 'constants/action_types';
 import moment from 'moment';
 import { ACTIONS as LBRY_REDUX_ACTIONS, SETTINGS, SHARED_PREFERENCES } from 'lbry-redux';
 import { getSubsetFromKeysArray } from 'util/sync-settings';
+import { getDefaultLanguage } from 'util/default-languages';
 import { UNSYNCED_SETTINGS } from 'config';
 
 const { CLIENT_SYNC_KEYS } = SHARED_PREFERENCES;
@@ -16,7 +17,7 @@ try {
   let appLanguage = window.localStorage.getItem(SETTINGS.LANGUAGE);
   settingLanguage.push(appLanguage);
 } catch (e) {}
-settingLanguage.push(window.navigator.language.slice(0, 2));
+settingLanguage.push(getDefaultLanguage());
 settingLanguage.push('en');
 
 const defaultState = {
@@ -45,7 +46,11 @@ const defaultState = {
     [SETTINGS.HIDE_BALANCE]: false,
     [SETTINGS.OS_NOTIFICATIONS_ENABLED]: true,
     [SETTINGS.AUTOMATIC_DARK_MODE_ENABLED]: false,
+    [SETTINGS.CLOCK_24H]: false,
     [SETTINGS.TILE_LAYOUT]: true,
+    [SETTINGS.VIDEO_THEATER_MODE]: false,
+    [SETTINGS.VIDEO_PLAYBACK_RATE]: 1,
+    [SETTINGS.DESKTOP_WINDOW_ZOOM]: 1,
 
     [SETTINGS.DARK_MODE_TIMES]: {
       from: { hour: '21', min: '00', formattedTime: '21:00' },

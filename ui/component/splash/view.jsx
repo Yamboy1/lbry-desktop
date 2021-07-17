@@ -30,7 +30,7 @@ type Props = {
   animationHidden: boolean,
   toggleSplashAnimation: () => void,
   clearWalletServers: () => void,
-  doShowSnackBar: string => void,
+  doShowSnackBar: (string) => void,
 };
 
 type State = {
@@ -109,30 +109,30 @@ export default class SplashScreen extends React.PureComponent<Props, State> {
     const { modal, notifyUnlockWallet, clearWalletServers, doShowSnackBar } = this.props;
     const { launchedModal } = this.state;
 
-    Lbry.status().then(status => {
+    Lbry.status().then((status) => {
       const sdkStatus = status;
       const { wallet } = status;
-      Lbry.wallet_status().then(status => {
+      Lbry.wallet_status().then((walletStatus) => {
         if (sdkStatus.is_running && wallet && wallet.available_servers) {
-          if (status.is_locked) {
+          if (walletStatus.is_locked) {
             // Clear the error timeout, it might sit on this step for a while until someone enters their password
             if (this.timeout) {
               clearTimeout(this.timeout);
             }
             // Make sure there isn't another active modal (like INCOMPATIBLE_DAEMON)
-            this.updateStatusCallback(sdkStatus, status, true);
+            this.updateStatusCallback(sdkStatus, walletStatus, true);
             if (launchedModal === false && !modal) {
               this.setState({ launchedModal: true }, () => notifyUnlockWallet());
             }
           } else {
-            this.updateStatusCallback(sdkStatus, status);
+            this.updateStatusCallback(sdkStatus, walletStatus);
           }
-        } else if (!sdkStatus.is_running && status.is_syncing) {
+        } else if (!sdkStatus.is_running && walletStatus.is_syncing) {
           // Clear the timeout if wallet is still syncing
           if (this.timeout) {
             clearTimeout(this.timeout);
           }
-          this.updateStatusCallback(sdkStatus, status);
+          this.updateStatusCallback(sdkStatus, walletStatus);
         } else if (this.state.waitingForWallet > MAX_WALLET_WAIT && launchedModal === false && !modal) {
           clearWalletServers();
           doShowSnackBar(
@@ -141,20 +141,15 @@ export default class SplashScreen extends React.PureComponent<Props, State> {
             )
           );
           this.setState({ waitingForWallet: 0 });
-          this.updateStatusCallback(sdkStatus, status);
+          this.updateStatusCallback(sdkStatus, walletStatus);
         } else {
-          this.updateStatusCallback(sdkStatus, status);
+          this.updateStatusCallback(sdkStatus, walletStatus);
         }
       });
     });
   }
 
   updateStatusCallback(status: StatusResponse, walletStatus: WalletStatusResponse, waitingForUnlock: boolean = false) {
-    if (status.connection_status.code !== 'connected') {
-      this.setState({ error: true });
-      return;
-    }
-
     const { wallet, startup_status: startupStatus } = status;
 
     // If the wallet is locked, stop doing anything and make the user input their password

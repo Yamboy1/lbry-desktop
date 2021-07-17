@@ -2,12 +2,10 @@
 import * as ICONS from 'constants/icons';
 import * as PAGES from 'constants/pages';
 import React from 'react';
-import { getThumbnailCdnUrl } from 'util/thumbnail';
 import { parseURI } from 'lbry-redux';
 import { YOUTUBE_STATUSES } from 'lbryinc';
 import Page from 'component/page';
 import SubscribeButton from 'component/subscribeButton';
-import BlockButton from 'component/blockButton';
 import ShareButton from 'component/shareButton';
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from 'component/common/tabs';
 import { useHistory } from 'react-router';
@@ -21,8 +19,14 @@ import ChannelEdit from 'component/channelEdit';
 import classnames from 'classnames';
 import HelpLink from 'component/common/help-link';
 import ClaimSupportButton from 'component/claimSupportButton';
+import ChannelStakedIndicator from 'component/channelStakedIndicator';
+import ClaimMenuList from 'component/claimMenuList';
+import Yrbl from 'component/yrbl';
+import I18nMessage from 'component/i18nMessage';
 
 export const PAGE_VIEW_QUERY = `view`;
+const CONTENT_PAGE = 'content';
+const LISTS_PAGE = 'lists';
 const ABOUT_PAGE = `about`;
 export const DISCUSSION_PAGE = `discussion`;
 const EDIT_PAGE = 'edit';
@@ -42,10 +46,13 @@ type Props = {
     txid: string,
     nout: number,
   }>,
-  fetchSubCount: string => void,
+  fetchSubCount: (string) => void,
   subCount: number,
   pending: boolean,
   youtubeChannels: ?Array<{ channel_claim_id: string, sync_status: string, transfer_state: string }>,
+  blockedChannels: Array<string>,
+  mutedChannels: Array<string>,
+  unpublishedCollections: CollectionGroup,
 };
 
 function ChannelPage(props: Props) {
@@ -54,21 +61,24 @@ function ChannelPage(props: Props) {
     claim,
     title,
     cover,
-    page,
+    // page, ?page= may come back some day?
     channelIsMine,
     isSubscribed,
-    channelIsBlocked,
     blackListedOutpoints,
     fetchSubCount,
     subCount,
     pending,
     youtubeChannels,
+    blockedChannels,
+    mutedChannels,
+    unpublishedCollections,
   } = props;
   const {
     push,
     goBack,
     location: { search },
   } = useHistory();
+  const [viewBlockedChannel, setViewBlockedChannel] = React.useState(false);
   const urlParams = new URLSearchParams(search);
   const currentView = urlParams.get(PAGE_VIEW_QUERY) || undefined;
   const [discussionWasMounted, setDiscussionWasMounted] = React.useState(false);
@@ -77,6 +87,8 @@ function ChannelPage(props: Props) {
   const { permanent_url: permanentUrl } = claim;
   const claimId = claim.claim_id;
   const formattedSubCount = Number(subCount).toLocaleString();
+  const isBlocked = claim && blockedChannels.includes(claim.permanent_url);
+  const isMuted = claim && mutedChannels.includes(claim.permanent_url);
   const isMyYouTubeChannel =
     claim &&
     youtubeChannels &&
@@ -89,26 +101,71 @@ function ChannelPage(props: Props) {
         return true;
       }
     });
+
+  const hasUnpublishedCollections = unpublishedCollections && Object.keys(unpublishedCollections).length;
+
+  let collectionEmpty;
+  if (channelIsMine) {
+    collectionEmpty = hasUnpublishedCollections ? (
+      <section className="main--empty">
+        {
+          <p>
+            <I18nMessage
+              tokens={{
+                pick: <Button button="link" navigate={`/$/${PAGES.LISTS}`} label={__('Pick')} />,
+              }}
+            >
+              You have unpublished lists! %pick% one and publish it!
+            </I18nMessage>
+          </p>
+        }
+      </section>
+    ) : (
+      <section className="main--empty">{__('You have no lists! Create one from any playable content.')}</section>
+    );
+  } else {
+    collectionEmpty = <section className="main--empty">{__('No Lists Found')}</section>;
+  }
+
   let channelIsBlackListed = false;
 
   if (claim && blackListedOutpoints) {
     channelIsBlackListed = blackListedOutpoints.some(
-      outpoint => outpoint.txid === claim.txid && outpoint.nout === claim.nout
+      (outpoint) => outpoint.txid === claim.txid && outpoint.nout === claim.nout
     );
   }
 
   // If a user changes tabs, update the url so it stays on the same page if they refresh.
   // We don't want to use links here because we can't animate the tab change and using links
   // would alter the Tab label's role attribute, which should stay role="tab" to work with keyboards/screen readers.
-  const tabIndex = currentView === ABOUT_PAGE || editing ? 1 : currentView === DISCUSSION_PAGE ? 2 : 0;
+  let tabIndex;
+  switch (currentView) {
+    case CONTENT_PAGE:
+      tabIndex = 0;
+      break;
+    case LISTS_PAGE:
+      tabIndex = 1;
+      break;
+    case ABOUT_PAGE:
+      tabIndex = 2;
+      break;
+    case DISCUSSION_PAGE:
+      tabIndex = 3;
+      break;
+    default:
+      tabIndex = 0;
+      break;
+  }
 
   function onTabChange(newTabIndex) {
     let url = formatLbryUrlForWeb(uri);
     let search = '?';
 
     if (newTabIndex === 0) {
-      search += `page=${page}`;
+      search += `${PAGE_VIEW_QUERY}=${CONTENT_PAGE}`;
     } else if (newTabIndex === 1) {
+      search += `${PAGE_VIEW_QUERY}=${LISTS_PAGE}`;
+    } else if (newTabIndex === 2) {
       search += `${PAGE_VIEW_QUERY}=${ABOUT_PAGE}`;
     } else {
       search += `${PAGE_VIEW_QUERY}=${DISCUSSION_PAGE}`;
@@ -154,25 +211,19 @@ function ChannelPage(props: Props) {
               navigate={`/$/${PAGES.CHANNELS}`}
             />
           )}
-          {!channelIsBlocked && !channelIsBlackListed && <ShareButton uri={uri} />}
-          {!channelIsBlocked && <ClaimSupportButton uri={uri} />}
-          {!channelIsBlocked && (!channelIsBlackListed || isSubscribed) && <SubscribeButton uri={permanentUrl} />}
-          {!isSubscribed && <BlockButton uri={permanentUrl} />}
+          {!channelIsBlackListed && <ShareButton uri={uri} />}
+          {!(isBlocked || isMuted) && <ClaimSupportButton uri={uri} />}
+          {!(isBlocked || isMuted) && (!channelIsBlackListed || isSubscribed) && <SubscribeButton uri={permanentUrl} />}
+          {/* TODO: add channel collections <ClaimCollectionAddButton uri={uri} fileAction /> */}
+          <ClaimMenuList uri={claim.permanent_url} channelUri={claim.permanent_url} inline isChannelPage />
         </div>
-        {cover && (
-          <img
-            className={classnames('channel-cover__custom', { 'channel__image--blurred': channelIsBlocked })}
-            src={IS_WEB ? getThumbnailCdnUrl({ thumbnail: cover, height: 200, width: 1000, quality: 100 }) : cover}
-          />
-        )}
+        {cover && <img className={classnames('channel-cover__custom')} src={cover} />}
         <div className="channel__primary-info">
-          <ChannelThumbnail
-            className="channel__thumbnail--channel-page"
-            uri={uri}
-            obscure={channelIsBlocked}
-            allowGifs
-          />
-          <h1 className="channel__title">{title || '@' + channelName}</h1>
+          <ChannelThumbnail className="channel__thumbnail--channel-page" uri={uri} allowGifs hideStakedIndicator />
+          <h1 className="channel__title">
+            {title || '@' + channelName}
+            <ChannelStakedIndicator uri={uri} large />
+          </h1>
           <div className="channel__meta">
             <span>
               {formattedSubCount} {subCount !== 1 ? __('Followers') : __('Follower')}
@@ -198,24 +249,62 @@ function ChannelPage(props: Props) {
         </div>
         <div className="channel-cover__gradient" />
       </header>
-      <Tabs onChange={onTabChange} index={tabIndex}>
-        <TabList className="tabs__list--channel-page">
-          <Tab disabled={editing}>{__('Content')}</Tab>
-          <Tab>{editing ? __('Editing Your Channel') : __('About --[tab title in Channel Page]--')}</Tab>
-          <Tab disabled={editing}>{__('Community')}</Tab>
-        </TabList>
-        <TabPanels>
-          <TabPanel>
-            <ChannelContent uri={uri} channelIsBlackListed={channelIsBlackListed} />
-          </TabPanel>
-          <TabPanel>
-            <ChannelAbout uri={uri} />
-          </TabPanel>
-          <TabPanel>
-            {(discussionWasMounted || currentView === DISCUSSION_PAGE) && <ChannelDiscussion uri={uri} />}
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+
+      {(isBlocked || isMuted) && !viewBlockedChannel ? (
+        <div className="main--empty">
+          <Yrbl
+            title={isBlocked ? __('This channel is blocked') : __('This channel is muted')}
+            subtitle={
+              isBlocked
+                ? __('Are you sure you want to view this content? Viewing will not unblock @%channel%', {
+                    channel: channelName,
+                  })
+                : __('Are you sure you want to view this content? Viewing will not unmute @%channel%', {
+                    channel: channelName,
+                  })
+            }
+            actions={
+              <div className="section__actions">
+                <Button button="primary" label={__('View Content')} onClick={() => setViewBlockedChannel(true)} />
+              </div>
+            }
+          />
+        </div>
+      ) : (
+        <Tabs onChange={onTabChange} index={tabIndex}>
+          <TabList className="tabs__list--channel-page">
+            <Tab disabled={editing}>{__('Content')}</Tab>
+            <Tab disabled={editing}>{__('Playlists')}</Tab>
+            <Tab>{editing ? __('Editing Your Channel') : __('About --[tab title in Channel Page]--')}</Tab>
+            <Tab disabled={editing}>{__('Community')}</Tab>
+          </TabList>
+          <TabPanels>
+            <TabPanel>
+              <ChannelContent
+                uri={uri}
+                channelIsBlackListed={channelIsBlackListed}
+                viewHiddenChannels
+                empty={<section className="main--empty">{__('No Content Found')}</section>}
+              />
+            </TabPanel>
+            <TabPanel>
+              <ChannelContent
+                claimType={'collection'}
+                uri={uri}
+                channelIsBlackListed={channelIsBlackListed}
+                viewHiddenChannels
+                empty={collectionEmpty}
+              />
+            </TabPanel>
+            <TabPanel>
+              <ChannelAbout uri={uri} />
+            </TabPanel>
+            <TabPanel>
+              {(discussionWasMounted || currentView === DISCUSSION_PAGE) && <ChannelDiscussion uri={uri} />}
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      )}
     </Page>
   );
 }

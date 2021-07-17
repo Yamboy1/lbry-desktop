@@ -10,11 +10,11 @@ import UriIndicator from 'component/uriIndicator';
 import usePersistedState from 'effects/use-persisted-state';
 import { PRIMARY_PLAYER_WRAPPER_CLASS } from 'page/file/view';
 import Draggable from 'react-draggable';
-import Tooltip from 'component/common/tooltip';
 import { onFullscreenChange } from 'util/full-screen';
 import { useIsMobile } from 'effects/use-screensize';
 import debounce from 'util/debounce';
 import { useHistory } from 'react-router';
+import { isURIEqual } from 'lbry-redux';
 
 const IS_DESKTOP_MAC = typeof process === 'object' ? process.platform === 'darwin' : false;
 const DEBOUNCE_WINDOW_RESIZE_HANDLER_MS = 60;
@@ -23,6 +23,7 @@ export const INLINE_PLAYER_WRAPPER_CLASS = 'inline-player__wrapper';
 type Props = {
   isFloating: boolean,
   fileInfo: FileListItem,
+  mature: boolean,
   uri: string,
   streamingUrl?: string,
   title: ?string,
@@ -31,11 +32,14 @@ type Props = {
   renderMode: string,
   playingUri: ?PlayingUri,
   primaryUri: ?string,
+  videoTheaterMode: boolean,
+  doFetchRecommendedContent: (string, boolean) => void,
 };
 
 export default function FileRenderFloating(props: Props) {
   const {
     fileInfo,
+    mature,
     uri,
     streamingUrl,
     title,
@@ -45,12 +49,14 @@ export default function FileRenderFloating(props: Props) {
     renderMode,
     playingUri,
     primaryUri,
+    videoTheaterMode,
+    doFetchRecommendedContent,
   } = props;
   const {
     location: { pathname },
   } = useHistory();
   const isMobile = useIsMobile();
-  const mainFilePlaying = playingUri && playingUri.uri === primaryUri;
+  const mainFilePlaying = playingUri && isURIEqual(playingUri.uri, primaryUri);
   const [fileViewerRect, setFileViewerRect] = useState();
   const [desktopPlayStartTime, setDesktopPlayStartTime] = useState();
   const [wasDragging, setWasDragging] = useState(false);
@@ -88,17 +94,16 @@ export default function FileRenderFloating(props: Props) {
   }
 
   function clampToScreen(pos) {
-    const GAP_PX = 10;
     const ESTIMATED_SCROLL_BAR_PX = 50;
     const FLOATING_PLAYER_CLASS = 'content__viewer--floating';
     const fpPlayerElem = document.querySelector(`.${FLOATING_PLAYER_CLASS}`);
 
     if (fpPlayerElem) {
       if (pos.x + fpPlayerElem.getBoundingClientRect().width > getScreenWidth() - ESTIMATED_SCROLL_BAR_PX) {
-        pos.x = getScreenWidth() - fpPlayerElem.getBoundingClientRect().width - ESTIMATED_SCROLL_BAR_PX - GAP_PX;
+        pos.x = getScreenWidth() - fpPlayerElem.getBoundingClientRect().width - ESTIMATED_SCROLL_BAR_PX;
       }
       if (pos.y + fpPlayerElem.getBoundingClientRect().height > getScreenHeight()) {
-        pos.y = getScreenHeight() - fpPlayerElem.getBoundingClientRect().height - GAP_PX * 2;
+        pos.y = getScreenHeight() - fpPlayerElem.getBoundingClientRect().height;
       }
     }
   }
@@ -129,7 +134,7 @@ export default function FileRenderFloating(props: Props) {
 
   // Listen to main-window resizing and adjust the fp position accordingly:
   useEffect(() => {
-    const handleMainWindowResize = debounce(e => {
+    const handleMainWindowResize = debounce((e) => {
       let newPos = {
         x: Math.round(relativePos.x * getScreenWidth()),
         y: Math.round(relativePos.y * getScreenHeight()),
@@ -187,7 +192,7 @@ export default function FileRenderFloating(props: Props) {
       window.removeEventListener('resize', handleResize);
       onFullscreenChange(window, 'remove', handleResize);
     };
-  }, [setFileViewerRect, isFloating, playingUriSource, mainFilePlaying]);
+  }, [setFileViewerRect, isFloating, playingUriSource, mainFilePlaying, videoTheaterMode]);
 
   useEffect(() => {
     // @if TARGET='app'
@@ -200,6 +205,12 @@ export default function FileRenderFloating(props: Props) {
       // @endif
     };
   }, [uri]);
+
+  useEffect(() => {
+    if (isFloating) {
+      doFetchRecommendedContent(uri, mature);
+    }
+  }, [uri, mature, isFloating]);
 
   if (!isPlayable || !uri || (isFloating && (isMobile || !floatingPlayerEnabled))) {
     return null;
@@ -248,6 +259,8 @@ export default function FileRenderFloating(props: Props) {
         className={classnames('content__viewer', {
           'content__viewer--floating': isFloating,
           'content__viewer--inline': !isFloating,
+          'content__viewer--secondary': playingUriSource === 'comment',
+          'content__viewer--theater-mode': !isFloating && videoTheaterMode,
         })}
         style={
           !isFloating && fileViewerRect
@@ -267,14 +280,13 @@ export default function FileRenderFloating(props: Props) {
           })}
         >
           {isFloating && (
-            <Tooltip label={__('Close')}>
-              <Button
-                onClick={closeFloatingPlayer}
-                icon={ICONS.REMOVE}
-                button="primary"
-                className="content__floating-close"
-              />
-            </Tooltip>
+            <Button
+              title={__('Close')}
+              onClick={closeFloatingPlayer}
+              icon={ICONS.REMOVE}
+              button="primary"
+              className="content__floating-close"
+            />
           )}
 
           {isReadyToPlay ? (
@@ -293,7 +305,7 @@ export default function FileRenderFloating(props: Props) {
               <div className="claim-preview__title" title={title || uri}>
                 <Button label={title || uri} navigate={uri} button="link" className="content__floating-link" />
               </div>
-              <UriIndicator link addTooltip={false} uri={uri} />
+              <UriIndicator link uri={uri} />
             </div>
           )}
         </div>

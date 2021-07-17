@@ -1,9 +1,13 @@
 // @flow
 import * as ACTIONS from 'constants/action_types';
-import * as NOTIFICATIONS from 'constants/notifications';
+import { RULE } from 'constants/notifications';
 import { Lbryio } from 'lbryinc';
 import { v4 as uuid } from 'uuid';
-import { selectNotifications } from 'redux/selectors/notifications';
+import {
+  selectNotifications,
+  selectNotificationsFiltered,
+  selectNotificationCategories,
+} from 'redux/selectors/notifications';
 import { doResolveUris } from 'lbry-redux';
 
 export function doToast(params: ToastParams) {
@@ -41,26 +45,47 @@ export function doDismissError() {
   };
 }
 
-export function doNotificationList() {
-  return (dispatch: Dispatch) => {
+export function doNotificationList(types?: Array<string>) {
+  return async (dispatch: Dispatch, getState: GetState) => {
+    const state = getState();
+    const notificationTypes = selectNotificationCategories(state);
+
     dispatch({ type: ACTIONS.NOTIFICATION_LIST_STARTED });
-    return Lbryio.call('notification', 'list', { is_app_readable: true })
-      .then(response => {
+
+    let params: any = { is_app_readable: true };
+    if (types) {
+      params.type = types.join(',');
+    }
+
+    try {
+      if (!notificationTypes) {
+        const notificationCategories = await Lbryio.call('notification', 'categories');
+        if (notificationCategories) {
+          dispatch({
+            type: ACTIONS.NOTIFICATION_CATEGORIES_COMPLETED,
+            data: {
+              notificationCategories: notificationCategories.reverse(),
+            },
+          });
+        }
+      }
+
+      return Lbryio.call('notification', 'list', params).then((response) => {
         const notifications = response || [];
         const channelsToResolve = notifications
           .filter((notification: WebNotification) => {
             if (
               (notification.notification_parameters.dynamic &&
                 notification.notification_parameters.dynamic.comment_author) ||
-              notification.notification_rule === NOTIFICATIONS.NEW_CONTENT
+              notification.notification_rule === RULE.NEW_CONTENT
             ) {
               return true;
             } else {
               return false;
             }
           })
-          .map(notification => {
-            if (notification.notification_rule === NOTIFICATIONS.NEW_CONTENT) {
+          .map((notification) => {
+            if (notification.notification_rule === RULE.NEW_CONTENT) {
               return notification.notification_parameters.device.target;
             } else {
               return notification.notification_parameters.dynamic.comment_author;
@@ -68,31 +93,46 @@ export function doNotificationList() {
           });
 
         dispatch(doResolveUris(channelsToResolve));
-        dispatch({ type: ACTIONS.NOTIFICATION_LIST_COMPLETED, data: { notifications } });
-      })
-      .catch(error => {
-        dispatch({ type: ACTIONS.NOTIFICATION_LIST_FAILED, data: { error } });
+        dispatch({
+          type: ACTIONS.NOTIFICATION_LIST_COMPLETED,
+          data: {
+            newNotifications: notifications,
+            filterRule: Boolean(types),
+          },
+        });
       });
+    } catch (error) {
+      dispatch({ type: ACTIONS.NOTIFICATION_LIST_FAILED, data: { error } });
+    }
   };
 }
 
-export function doReadNotifications() {
+export function doReadNotifications(notificationsIds: Array<number>) {
   return (dispatch: Dispatch, getState: GetState) => {
     const state = getState();
     const notifications = selectNotifications(state);
-    const unreadNotifications =
-      notifications &&
-      notifications
-        .filter(notification => !notification.is_read)
-        .map(notification => notification.id)
-        .join(',');
+    const notificationsFiltered = selectNotificationsFiltered(state);
+
+    if (!notifications || !notificationsFiltered) {
+      return;
+    }
+
+    let ids;
+    if (notificationsIds && Array.isArray(notificationsIds) && notificationsIds.length !== 0) {
+      // Wipe specified notifications.
+      ids = notificationsIds;
+    } else {
+      // A null or invalid argument will wipe all unread notifications.
+      const getUnreadIds = (list) => list.filter((n) => !n.is_read).map((n) => n.id);
+      ids = Array.from(new Set([...getUnreadIds(notifications), ...getUnreadIds(notificationsFiltered)]));
+    }
 
     dispatch({ type: ACTIONS.NOTIFICATION_READ_STARTED });
-    return Lbryio.call('notification', 'edit', { notification_ids: unreadNotifications, is_read: true })
+    return Lbryio.call('notification', 'edit', { notification_ids: ids.join(','), is_read: true })
       .then(() => {
-        dispatch({ type: ACTIONS.NOTIFICATION_READ_COMPLETED });
+        dispatch({ type: ACTIONS.NOTIFICATION_READ_COMPLETED, data: { notificationIds: ids } });
       })
-      .catch(error => {
+      .catch((error) => {
         dispatch({ type: ACTIONS.NOTIFICATION_READ_FAILED, data: { error } });
       });
   };
@@ -110,7 +150,7 @@ export function doSeeNotifications(notificationIds: Array<string>) {
           },
         });
       })
-      .catch(error => {
+      .catch((error) => {
         dispatch({ type: ACTIONS.NOTIFICATION_SEEN_FAILED, data: { error } });
       });
   };
@@ -120,10 +160,16 @@ export function doSeeAllNotifications() {
   return (dispatch: Dispatch, getState: GetState) => {
     const state = getState();
     const notifications = selectNotifications(state);
-    const unSeenNotifications =
-      notifications && notifications.filter(notification => !notification.is_seen).map(notification => notification.id);
+    const notificationsFiltered = selectNotificationsFiltered(state);
 
-    dispatch(doSeeNotifications(unSeenNotifications));
+    if (!notifications || !notificationsFiltered) {
+      return;
+    }
+
+    const getUnseenIds = (list) => list.filter((n) => !n.is_seen).map((n) => n.id);
+    const unseenIds = Array.from(new Set([...getUnseenIds(notifications), ...getUnseenIds(notificationsFiltered)]));
+
+    dispatch(doSeeNotifications(unseenIds));
   };
 }
 

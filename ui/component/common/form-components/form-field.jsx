@@ -8,6 +8,15 @@ import { openEditorMenu, stopContextMenu } from 'util/context-menu';
 import { FF_MAX_CHARS_DEFAULT } from 'constants/form-field';
 import 'easymde/dist/easymde.min.css';
 import Button from 'component/button';
+import emoji from 'emoji-dictionary';
+
+const QUICK_EMOJIS = [
+  emoji.getUnicode('rocket'),
+  emoji.getUnicode('jeans'),
+  emoji.getUnicode('fire'),
+  emoji.getUnicode('heart'),
+  emoji.getUnicode('open_mouth'),
+];
 
 type Props = {
   name: string,
@@ -18,7 +27,7 @@ type Props = {
   error?: string | boolean,
   helper?: string | React$Node,
   type?: string,
-  onChange?: any => any,
+  onChange?: (any) => any,
   defaultValue?: string | number,
   placeholder?: string | number,
   children?: React$Node,
@@ -26,9 +35,6 @@ type Props = {
   affixClass?: string, // class applied to prefix/postfix label
   autoFocus?: boolean,
   labelOnLeft: boolean,
-  inputProps?: {
-    disabled?: boolean,
-  },
   inputButton?: React$Node,
   blockWrap: boolean,
   charCount?: number,
@@ -37,7 +43,11 @@ type Props = {
   min?: number,
   max?: number,
   quickActionLabel?: string,
-  quickActionHandler?: any => any,
+  quickActionHandler?: (any) => any,
+  disabled?: boolean,
+  onChange: (any) => void,
+  value?: string | number,
+  noEmojis?: boolean,
 };
 
 export class FormField extends React.PureComponent<Props> {
@@ -80,9 +90,10 @@ export class FormField extends React.PureComponent<Props> {
       labelOnLeft,
       blockWrap,
       charCount,
-      textAreaMaxLength = FF_MAX_CHARS_DEFAULT,
+      textAreaMaxLength,
       quickActionLabel,
       quickActionHandler,
+      noEmojis,
       ...inputProps
     } = this.props;
     const errorMessage = typeof error === 'object' ? error.message : error;
@@ -147,7 +158,7 @@ export class FormField extends React.PureComponent<Props> {
           contextmenu: openEditorMenu,
         };
 
-        const getInstance = editor => {
+        const getInstance = (editor) => {
           // SimpleMDE max char check
           editor.codemirror.on('beforeChange', (instance, changes) => {
             if (textAreaMaxLength && changes.update) {
@@ -163,6 +174,44 @@ export class FormField extends React.PureComponent<Props> {
               }
             }
           });
+
+          // "Create Link (Ctrl-K)": highlight URL instead of label:
+          editor.codemirror.on('changes', (instance, changes) => {
+            try {
+              // Grab the last change from the buffered list. I assume the
+              // buffered one ('changes', instead of 'change') is more efficient,
+              // and that "Create Link" will always end up last in the list.
+              const lastChange = changes[changes.length - 1];
+              if (lastChange.origin === '+input') {
+                // https://github.com/Ionaru/easy-markdown-editor/blob/8fa54c496f98621d5f45f57577ce630bee8c41ee/src/js/easymde.js#L765
+                const EASYMDE_URL_PLACEHOLDER = '(https://)';
+
+                // The URL placeholder is always placed last, so just look at the
+                // last text in the array to also cover the multi-line case:
+                const urlLineText = lastChange.text[lastChange.text.length - 1];
+
+                if (urlLineText.endsWith(EASYMDE_URL_PLACEHOLDER) && urlLineText !== '[]' + EASYMDE_URL_PLACEHOLDER) {
+                  const from = lastChange.from;
+                  const to = lastChange.to;
+                  const isSelectionMultiline = lastChange.text.length > 1;
+                  const baseIndex = isSelectionMultiline ? 0 : from.ch;
+
+                  // Everything works fine for the [Ctrl-K] case, but for the
+                  // [Button] case, this handler happens before the original
+                  // code, thus our change got wiped out.
+                  // Add a small delay to handle that case.
+                  setTimeout(() => {
+                    instance.setSelection(
+                      { line: to.line, ch: baseIndex + urlLineText.lastIndexOf('(') + 1 },
+                      { line: to.line, ch: baseIndex + urlLineText.lastIndexOf(')') }
+                    );
+                  }, 25);
+                }
+              }
+            } catch (err) {
+              // Do nothing (revert to original behavior)
+            }
+          });
         };
 
         // Ideally, the character count should (and can) be appended to the
@@ -170,7 +219,7 @@ export class FormField extends React.PureComponent<Props> {
         // to pass the current value to it's callback, nor query the current
         // text length from the callback. So, we'll use our own widget.
         const hasCharCount = charCount !== undefined && charCount >= 0;
-        const countInfo = hasCharCount && (
+        const countInfo = hasCharCount && textAreaMaxLength !== undefined && (
           <span className="comment__char-count-mde">{`${charCount || '0'}/${textAreaMaxLength}`}</span>
         );
 
@@ -204,7 +253,7 @@ export class FormField extends React.PureComponent<Props> {
         );
       } else if (type === 'textarea') {
         const hasCharCount = charCount !== undefined && charCount >= 0;
-        const countInfo = hasCharCount && (
+        const countInfo = hasCharCount && textAreaMaxLength !== undefined && (
           <span className="comment__char-count">{`${charCount || '0'}/${textAreaMaxLength}`}</span>
         );
         input = (
@@ -217,8 +266,34 @@ export class FormField extends React.PureComponent<Props> {
                 {quickAction}
               </div>
             )}
-            <textarea type={type} id={name} maxLength={textAreaMaxLength} ref={this.input} {...inputProps} />
-            {countInfo}
+            <textarea
+              type={type}
+              id={name}
+              maxLength={textAreaMaxLength || FF_MAX_CHARS_DEFAULT}
+              ref={this.input}
+              {...inputProps}
+            />
+            <div className="form-field__textarea-info">
+              {!noEmojis && (
+                <div className="form-field__quick-emojis">
+                  {QUICK_EMOJIS.map((emoji) => (
+                    <Button
+                      key={emoji}
+                      disabled={inputProps.disabled}
+                      type="button"
+                      className="button--emoji"
+                      label={emoji}
+                      onClick={() => {
+                        inputProps.onChange({
+                          target: { value: inputProps.value ? `${inputProps.value} ${emoji}` : emoji },
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              {countInfo}
+            </div>
           </fieldset-section>
         );
       } else {

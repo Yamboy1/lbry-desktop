@@ -8,36 +8,32 @@
   File upload is carried out in the background by that function.
  */
 
-import { SITE_NAME } from 'config';
-import { CHANNEL_NEW, CHANNEL_ANONYMOUS } from 'constants/claim';
+import { SITE_NAME, ENABLE_NO_SOURCE_CLAIMS, SIMPLE_SITE, CHANNEL_STAKED_LEVEL_LIVESTREAM } from 'config';
 import React, { useEffect, useState } from 'react';
-import { buildURI, isURIValid, isNameValid, THUMBNAIL_STATUSES } from 'lbry-redux';
+import { buildURI, isURIValid, isNameValid, THUMBNAIL_STATUSES, Lbry } from 'lbry-redux';
 import Button from 'component/button';
-import SelectChannel from 'component/selectChannel';
+import ChannelSelect from 'component/channelSelector';
 import classnames from 'classnames';
 import TagsSelect from 'component/tagsSelect';
 import PublishDescription from 'component/publishDescription';
 import PublishPrice from 'component/publishPrice';
 import PublishFile from 'component/publishFile';
-import PublishName from 'component/publishName';
+import PublishBid from 'component/publishBid';
 import PublishAdditionalOptions from 'component/publishAdditionalOptions';
 import PublishFormErrors from 'component/publishFormErrors';
 import SelectThumbnail from 'component/selectThumbnail';
 import Card from 'component/common/card';
 import I18nMessage from 'component/i18nMessage';
 import * as PUBLISH_MODES from 'constants/publish_types';
+import { useHistory } from 'react-router';
+import Spinner from 'component/spinner';
+import { toHex } from 'util/hex';
+import { BITWAVE_REPLAY_API } from 'constants/livestream';
 
 // @if TARGET='app'
 import fs from 'fs';
 import tempy from 'tempy';
 // @endif
-
-const MODES = Object.values(PUBLISH_MODES);
-
-const MODE_TO_I18N_STR = {
-  [PUBLISH_MODES.FILE]: 'File',
-  [PUBLISH_MODES.POST]: 'Post --[noun, markdown post tab button]--',
-};
 
 type Props = {
   disabled: boolean,
@@ -50,6 +46,7 @@ type Props = {
   editingURI: ?string,
   title: ?string,
   thumbnail: ?string,
+  thumbnailError: ?boolean,
   uploadThumbnailStatus: ?string,
   thumbnailPath: ?string,
   description: ?string,
@@ -60,7 +57,6 @@ type Props = {
     amount: string,
     currency: string,
   },
-  channel: string,
   name: ?string,
   nameError: ?string,
   isResolvingUri: boolean,
@@ -71,37 +67,37 @@ type Props = {
   licenseUrl: ?string,
   useLBRYUploader: ?boolean,
   publishing: boolean,
+  publishSuccess: boolean,
   balance: number,
   isStillEditing: boolean,
   clearPublish: () => void,
-  resolveUri: string => void,
+  resolveUri: (string) => void,
   scrollToTop: () => void,
   prepareEdit: (claim: any, uri: string) => void,
   resetThumbnailStatus: () => void,
   amountNeededForTakeover: ?number,
   // Add back type
-  updatePublishForm: any => void,
-  checkAvailability: string => void,
+  updatePublishForm: (any) => void,
+  checkAvailability: (string) => void,
   ytSignupPending: boolean,
   modal: { id: string, modalProps: {} },
   enablePublishPreview: boolean,
+  activeChannelClaim: ?ChannelClaim,
+  incognito: boolean,
+  user: ?User,
+  activeChannelStakedLevel: number,
+  isLivestreamClaim: boolean,
+  isPostClaim: boolean,
+  permanentUrl: ?string,
+  remoteUrl: ?string,
 };
 
 function PublishForm(props: Props) {
-  const [mode, setMode] = React.useState(PUBLISH_MODES.FILE);
-  const [autoSwitchMode, setAutoSwitchMode] = React.useState(true);
-
-  // Used to checl if the url name has changed:
-  // A new file needs to be provided
-  const [prevName, setPrevName] = React.useState(false);
-  // Used to checl if the file has been modified by user
-  const [fileEdited, setFileEdited] = React.useState(false);
-  const [prevFileText, setPrevFileText] = React.useState('');
-
+  // Detect upload type from query in URL
   const {
     thumbnail,
+    thumbnailError,
     name,
-    channel,
     editingURI,
     myClaimForUri,
     resolveUri,
@@ -114,6 +110,7 @@ function PublishForm(props: Props) {
     filePath,
     fileText,
     publishing,
+    publishSuccess,
     clearPublish,
     isStillEditing,
     tags,
@@ -123,44 +120,149 @@ function PublishForm(props: Props) {
     ytSignupPending,
     modal,
     enablePublishPreview,
+    activeChannelClaim,
+    incognito,
+    user,
+    activeChannelStakedLevel,
+    isLivestreamClaim,
+    isPostClaim,
+    permanentUrl,
+    remoteUrl,
   } = props;
 
-  // Used to check if name should be auto-populated from title
-  const [autoPopulateNameFromTitle, setAutoPopulateNameFromTitle] = useState(!isStillEditing);
+  const { replace, location } = useHistory();
+  const urlParams = new URLSearchParams(location.search);
+  const TYPE_PARAM = 'type';
+  const uploadType = urlParams.get(TYPE_PARAM);
+  const _uploadType = uploadType && uploadType.toLowerCase();
+  const enableLivestream =
+    ENABLE_NO_SOURCE_CLAIMS &&
+    user &&
+    !user.odysee_live_disabled &&
+    (activeChannelStakedLevel >= CHANNEL_STAKED_LEVEL_LIVESTREAM || user.odysee_live_enabled);
+  // $FlowFixMe
+  const AVAILABLE_MODES = Object.values(PUBLISH_MODES).filter((mode) => {
+    // $FlowFixMe
+    if (editingURI) {
+      if (isPostClaim) {
+        return mode === PUBLISH_MODES.POST;
+      } else if (isLivestreamClaim) {
+        return mode === PUBLISH_MODES.LIVESTREAM && enableLivestream;
+      } else {
+        return mode === PUBLISH_MODES.FILE;
+      }
+    } else if (_uploadType) {
+      return mode === _uploadType && (mode !== PUBLISH_MODES.LIVESTREAM || enableLivestream);
+    } else {
+      return mode !== PUBLISH_MODES.LIVESTREAM || enableLivestream;
+    }
+  });
 
+  const MODE_TO_I18N_STR = {
+    [PUBLISH_MODES.FILE]: SIMPLE_SITE ? 'Video/Audio' : 'File',
+    [PUBLISH_MODES.POST]: 'Post --[noun, markdown post tab button]--',
+    [PUBLISH_MODES.LIVESTREAM]: 'Livestream --[noun, livestream tab button]--',
+  };
+
+  const [mode, setMode] = React.useState(_uploadType || PUBLISH_MODES.FILE);
+  const [isCheckingLivestreams, setCheckingLivestreams] = React.useState(false);
+
+  let customSubtitle;
+  if (mode === PUBLISH_MODES.LIVESTREAM || isLivestreamClaim) {
+    if (isLivestreamClaim) {
+      customSubtitle = __('Update your livestream');
+    } else {
+      customSubtitle = __('Prepare an upcoming livestream');
+    }
+  } else if (mode === PUBLISH_MODES.POST || isPostClaim) {
+    if (isPostClaim) {
+      customSubtitle = __('Edit your post');
+    } else {
+      customSubtitle = __('Craft an epic post clearly explaining... whatever.');
+    }
+  } else {
+    if (editingURI) {
+      customSubtitle = __('Update your video');
+    } else {
+      customSubtitle = __('Upload that unlabeled video you found behind the TV in 1991');
+    }
+  }
+
+  const [autoSwitchMode, setAutoSwitchMode] = React.useState(true);
+
+  // Used to check if the url name has changed:
+  // A new file needs to be provided
+  const [prevName, setPrevName] = React.useState(false);
+  // Used to check if the file has been modified by user
+  const [fileEdited, setFileEdited] = React.useState(false);
+  const [prevFileText, setPrevFileText] = React.useState('');
+
+  const [waitForFile, setWaitForFile] = useState(false);
+  const [livestreamData, setLivestreamData] = React.useState([]);
+  const [signedMessage, setSignedMessage] = React.useState({ signature: undefined, signing_ts: undefined });
+  const signedMessageStr = JSON.stringify(signedMessage);
   const TAGS_LIMIT = 5;
-  const fileFormDisabled = mode === PUBLISH_MODES.FILE && !filePath;
+  const fileFormDisabled = mode === PUBLISH_MODES.FILE && !filePath && !remoteUrl;
   const emptyPostError = mode === PUBLISH_MODES.POST && (!fileText || fileText.trim() === '');
   const formDisabled = (fileFormDisabled && !editingURI) || emptyPostError || publishing;
   const isInProgress = filePath || editingURI || name || title;
-
+  const activeChannelName = activeChannelClaim && activeChannelClaim.name;
+  const activeChannelClaimStr = JSON.stringify(activeChannelClaim);
   // Editing content info
-  const uri = myClaimForUri ? myClaimForUri.permanent_url : undefined;
   const fileMimeType =
     myClaimForUri && myClaimForUri.value && myClaimForUri.value.source
       ? myClaimForUri.value.source.media_type
       : undefined;
+  const claimChannelId =
+    (myClaimForUri && myClaimForUri.signing_channel && myClaimForUri.signing_channel.claim_id) ||
+    (activeChannelClaim && activeChannelClaim.claim_id);
+
   const nameEdited = isStillEditing && name !== prevName;
 
+  const waitingForFile = waitForFile && !remoteUrl && !filePath;
   // If they are editing, they don't need a new file chosen
   const formValidLessFile =
     name &&
     isNameValid(name, false) &&
     title &&
     bid &&
+    thumbnail &&
     !bidError &&
     !emptyPostError &&
+    !thumbnailError &&
     !(uploadThumbnailStatus === THUMBNAIL_STATUSES.IN_PROGRESS);
 
   const isOverwritingExistingClaim = !editingURI && myClaimForUri;
 
   const formValid = isOverwritingExistingClaim
     ? false
-    : editingURI && !filePath
-    ? isStillEditing && formValidLessFile
+    : editingURI && !filePath // if we're editing we don't need a file
+    ? isStillEditing && formValidLessFile && !waitingForFile
     : formValidLessFile;
 
   const [previewing, setPreviewing] = React.useState(false);
+
+  React.useEffect(() => {
+    if (activeChannelClaimStr) {
+      const channelClaim = JSON.parse(activeChannelClaimStr);
+      const message = 'get-claim-id-replays';
+      setSignedMessage({ signature: null, signing_ts: null });
+      // ensure we have a channel
+      if (channelClaim.claim_id) {
+        Lbry.channel_sign({
+          channel_id: channelClaim.claim_id,
+          hexdata: toHex(message),
+        })
+          .then((data) => {
+            setSignedMessage(data);
+          })
+          .catch((error) => {
+            setSignedMessage({ signature: null, signing_ts: null });
+          });
+      }
+    }
+  }, [activeChannelClaimStr, setSignedMessage]);
+
   useEffect(() => {
     if (!modal) {
       setTimeout(() => {
@@ -169,14 +271,59 @@ function PublishForm(props: Props) {
     }
   }, [modal]);
 
+  // move this to lbryinc OR to a file under ui, and/or provide a standardized livestreaming config.
+  function fetchLivestreams(channelId, signature, timestamp) {
+    setCheckingLivestreams(true);
+    fetch(`${BITWAVE_REPLAY_API}/${channelId}?signature=${signature || ''}&signing_ts=${timestamp || ''}`) // claimChannelId
+      .then((res) => res.json())
+      .then((res) => {
+        if (!res || !res.data) {
+          setLivestreamData([]);
+        }
+        setLivestreamData(res.data);
+        setCheckingLivestreams(false);
+      })
+      .catch((e) => {
+        setLivestreamData([]);
+        setCheckingLivestreams(false);
+      });
+  }
+
+  useEffect(() => {
+    const signedMessage = JSON.parse(signedMessageStr);
+    if (claimChannelId && signedMessage.signature) {
+      fetchLivestreams(claimChannelId, signedMessage.signature, signedMessage.signing_ts);
+    }
+  }, [claimChannelId, signedMessageStr]);
+
+  const isLivestreamMode = mode === PUBLISH_MODES.LIVESTREAM;
   let submitLabel;
-  if (isStillEditing) {
-    submitLabel = !publishing ? __('Save') : __('Saving...');
+  if (publishing) {
+    if (isStillEditing) {
+      submitLabel = __('Saving...');
+    } else if (isLivestreamMode) {
+      submitLabel = __('Creating...');
+    } else {
+      submitLabel = __('Uploading...');
+    }
   } else if (previewing) {
     submitLabel = __('Preparing...');
   } else {
-    submitLabel = !publishing ? __('Upload') : __('Uploading...');
+    if (isStillEditing) {
+      submitLabel = __('Save');
+    } else if (isLivestreamMode) {
+      submitLabel = __('Create');
+    } else {
+      submitLabel = __('Upload');
+    }
   }
+
+  // if you enter the page and it is stuck in publishing, "stop it."
+  useEffect(() => {
+    if (publishing || publishSuccess) {
+      clearPublish();
+    }
+  }, [clearPublish]);
 
   useEffect(() => {
     if (!thumbnail) {
@@ -184,7 +331,7 @@ function PublishForm(props: Props) {
     }
   }, [thumbnail, resetThumbnailStatus]);
 
-  // Save current name of the editing claim
+  // Save previous name of the editing claim
   useEffect(() => {
     if (isStillEditing && (!prevName || !prevName.trim() === '')) {
       if (name !== prevName) {
@@ -204,16 +351,13 @@ function PublishForm(props: Props) {
 
   // Every time the channel or name changes, resolve the uris to find winning bid amounts
   useEffect(() => {
-    // If they are midway through a channel creation, treat it as anonymous until it completes
-    const channelName = channel === CHANNEL_ANONYMOUS || channel === CHANNEL_NEW ? '' : channel;
-
     // We are only going to store the full uri, but we need to resolve the uri with and without the channel name
     let uri;
     try {
-      uri = name && buildURI({ streamName: name, channelName });
+      uri = name && buildURI({ streamName: name, activeChannelName });
     } catch (e) {}
 
-    if (channelName && name) {
+    if (activeChannelName && name) {
       // resolve without the channel name so we know the winning bid for it
       try {
         const uriLessChannel = buildURI({ streamName: name });
@@ -227,15 +371,75 @@ function PublishForm(props: Props) {
       checkAvailability(name);
       updatePublishForm({ uri });
     }
-  }, [name, channel, resolveUri, updatePublishForm, checkAvailability]);
+  }, [name, activeChannelName, resolveUri, updatePublishForm, checkAvailability]);
 
+  // because publish editingUri is channel_short/claim_long and we don't have that, resolve it.
   useEffect(() => {
-    updatePublishForm({ isMarkdownPost: mode === PUBLISH_MODES.POST });
+    if (editingURI) {
+      resolveUri(editingURI);
+    }
+  }, [editingURI, resolveUri]);
+
+  // set isMarkdownPost in publish form if so, also update isLivestreamPublish
+  useEffect(() => {
+    updatePublishForm({
+      isMarkdownPost: mode === PUBLISH_MODES.POST,
+      isLivestreamPublish: mode === PUBLISH_MODES.LIVESTREAM,
+    });
   }, [mode, updatePublishForm]);
 
-  function handleChannelNameChange(channel) {
-    updatePublishForm({ channel });
-  }
+  useEffect(() => {
+    if (incognito) {
+      updatePublishForm({ channel: undefined });
+
+      // Anonymous livestreams aren't supported
+      if (isLivestreamMode) {
+        setMode(PUBLISH_MODES.FILE);
+      }
+    } else if (activeChannelName) {
+      updatePublishForm({ channel: activeChannelName });
+    }
+  }, [activeChannelName, incognito, updatePublishForm, isLivestreamMode]);
+
+  // set mode based on urlParams 'type'
+  useEffect(() => {
+    // Default to standard file publish if none specified
+    if (!_uploadType) {
+      setMode(PUBLISH_MODES.FILE);
+      return;
+    }
+
+    // File publish
+    if (_uploadType === PUBLISH_MODES.FILE.toLowerCase()) {
+      setMode(PUBLISH_MODES.FILE);
+      return;
+    }
+    // Post publish
+    if (_uploadType === PUBLISH_MODES.POST.toLowerCase()) {
+      setMode(PUBLISH_MODES.POST);
+      return;
+    }
+    // LiveStream publish
+    if (_uploadType === PUBLISH_MODES.LIVESTREAM.toLowerCase()) {
+      if (enableLivestream) {
+        setMode(PUBLISH_MODES.LIVESTREAM);
+      } else {
+        setMode(PUBLISH_MODES.FILE);
+      }
+      return;
+    }
+
+    // Default to standard file publish
+    setMode(PUBLISH_MODES.FILE);
+  }, [_uploadType, enableLivestream]);
+
+  // if we have a type urlparam, update it? necessary?
+  useEffect(() => {
+    if (!_uploadType) return;
+    const newParams = new URLSearchParams();
+    newParams.set(TYPE_PARAM, mode.toLowerCase());
+    replace({ search: newParams.toString() });
+  }, [mode, _uploadType]);
 
   // @if TARGET='web'
   function createWebFile() {
@@ -302,7 +506,7 @@ function PublishForm(props: Props) {
       }
     }
     // Publish file
-    if (mode === PUBLISH_MODES.FILE) {
+    if (mode === PUBLISH_MODES.FILE || isLivestreamMode) {
       runPublish = true;
     }
 
@@ -328,28 +532,44 @@ function PublishForm(props: Props) {
     }
   }, [autoSwitchMode, editingURI, fileMimeType, myClaimForUri, mode, setMode, setAutoSwitchMode]);
 
+  if (publishing) {
+    return (
+      <div className="main--empty">
+        <h1 className="section__subtitle">{__('Publishing...')}</h1>
+        <Spinner delayed />
+      </div>
+    );
+  }
   // Editing claim uri
   return (
     <div className="card-stack">
+      <ChannelSelect hideAnon={isLivestreamMode} disabled={disabled} />
+
       <PublishFile
-        uri={uri}
+        uri={permanentUrl}
         mode={mode}
         fileMimeType={fileMimeType}
         disabled={disabled || publishing}
         inProgress={isInProgress}
         setPublishMode={setMode}
         setPrevFileText={setPrevFileText}
-        autoPopulateName={autoPopulateNameFromTitle}
-        setAutoPopulateName={setAutoPopulateNameFromTitle}
+        livestreamData={livestreamData}
+        subtitle={customSubtitle}
+        setWaitForFile={setWaitForFile}
+        isCheckingLivestreams={isCheckingLivestreams}
+        checkLivestreams={fetchLivestreams}
+        channelId={claimChannelId}
+        channelSignature={signedMessage}
         header={
           <>
-            {MODES.map((modeName, index) => (
+            {AVAILABLE_MODES.map((modeName) => (
               <Button
-                key={index}
+                key={String(modeName)}
                 icon={modeName}
                 label={__(MODE_TO_I18N_STR[String(modeName)] || '---')}
                 button="alt"
                 onClick={() => {
+                  // $FlowFixMe
                   setMode(modeName);
                 }}
                 className={classnames('button-toggle', { 'button-toggle--active': mode === modeName })}
@@ -358,59 +578,45 @@ function PublishForm(props: Props) {
           </>
         }
       />
+
       {!publishing && (
         <div className={classnames({ 'card--disabled': formDisabled })}>
-          {mode === PUBLISH_MODES.FILE && <PublishDescription disabled={formDisabled} />}
-          <Card actions={<SelectThumbnail />} />
+          {mode !== PUBLISH_MODES.POST && <PublishDescription disabled={formDisabled} />}
+          <Card actions={<SelectThumbnail livestreamdData={livestreamData} />} />
           <TagsSelect
-            suggestMature
+            suggestMature={!SIMPLE_SITE}
             disableAutoFocus
             hideHeader
             label={__('Selected Tags')}
             empty={__('No tags added')}
             limitSelect={TAGS_LIMIT}
             help={__(
-              "Add tags that are relevant to your content so those who're looking for it can find it more easily. If mature content, ensure it is tagged mature. Tag abuse and missing mature tags will not be tolerated."
+              "Add tags that are relevant to your content so those who're looking for it can find it more easily. If your content is best suited for mature audiences, ensure it is tagged 'mature'."
             )}
             placeholder={__('gaming, crypto')}
-            onSelect={newTags => {
+            onSelect={(newTags) => {
               const validatedTags = [];
-              newTags.forEach(newTag => {
-                if (!tags.some(tag => tag.name === newTag.name)) {
+              newTags.forEach((newTag) => {
+                if (!tags.some((tag) => tag.name === newTag.name)) {
                   validatedTags.push(newTag);
                 }
               });
               updatePublishForm({ tags: [...tags, ...validatedTags] });
             }}
-            onRemove={clickedTag => {
-              const newTags = tags.slice().filter(tag => tag.name !== clickedTag.name);
+            onRemove={(clickedTag) => {
+              const newTags = tags.slice().filter((tag) => tag.name !== clickedTag.name);
               updatePublishForm({ tags: newTags });
             }}
             tagsChosen={tags}
           />
 
-          <Card
-            actions={
-              <React.Fragment>
-                <SelectChannel channel={channel} onChannelChange={handleChannelNameChange} />
-                <p className="help">
-                  {__('This is a username or handle that your content can be found under.')}{' '}
-                  {__('Ex. @Marvel, @TheBeatles, @BooksByJoe')}
-                </p>
-              </React.Fragment>
-            }
-          />
-          <PublishName
-            disabled={isStillEditing || formDisabled}
-            autoPopulateName={autoPopulateNameFromTitle}
-            setAutoPopulateName={setAutoPopulateNameFromTitle}
-          />
-          <PublishPrice disabled={formDisabled} />
+          <PublishBid disabled={isStillEditing || formDisabled} />
+          {!isLivestreamMode && <PublishPrice disabled={formDisabled} />}
           <PublishAdditionalOptions disabled={formDisabled} />
         </div>
       )}
       <section>
-        <div className="card__actions">
+        <div className="section__actions">
           <Button
             button="primary"
             onClick={handlePublish}
@@ -423,11 +629,11 @@ function PublishForm(props: Props) {
               previewing
             }
           />
-          <Button button="link" onClick={clearPublish} label={__('Cancel')} />
+          <Button button="link" onClick={clearPublish} label={__('New --[clears Publish Form]--')} />
         </div>
         <p className="help">
           {!formDisabled && !formValid ? (
-            <PublishFormErrors mode={mode} />
+            <PublishFormErrors mode={mode} waitForFile={waitingForFile} />
           ) : (
             <I18nMessage
               tokens={{

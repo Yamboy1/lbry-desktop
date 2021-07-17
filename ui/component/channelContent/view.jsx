@@ -1,5 +1,5 @@
 // @flow
-import { SHOW_ADS } from 'config';
+import { SHOW_ADS, ENABLE_NO_SOURCE_CLAIMS } from 'config';
 import * as CS from 'constants/claim_search';
 import * as ICONS from 'constants/icons';
 import React, { Fragment } from 'react';
@@ -9,6 +9,7 @@ import Button from 'component/button';
 import ClaimListDiscover from 'component/claimListDiscover';
 import Ads from 'web/component/ads';
 import Icon from 'component/common/icon';
+import LivestreamLink from 'component/livestreamLink';
 import { Form, FormField } from 'component/common/form';
 import { DEBOUNCE_WAIT_DURATION_MS } from 'constants/search';
 import { lighthouse } from 'redux/actions/search';
@@ -25,10 +26,14 @@ type Props = {
   channelIsBlackListed: boolean,
   defaultPageSize?: number,
   defaultInfiniteScroll?: Boolean,
-  claim: ?Claim,
+  claim: Claim,
   isAuthenticated: boolean,
   showMature: boolean,
   tileLayout: boolean,
+  viewHiddenChannels: boolean,
+  doResolveUris: (Array<string>, boolean) => void,
+  claimType: string,
+  empty?: string,
 };
 
 function ChannelContent(props: Props) {
@@ -44,6 +49,10 @@ function ChannelContent(props: Props) {
     defaultInfiniteScroll = true,
     showMature,
     tileLayout,
+    viewHiddenChannels,
+    doResolveUris,
+    claimType,
+    empty,
   } = props;
   const claimsInChannel = (claim && claim.meta.claims_in_channel) || 0;
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -53,6 +62,7 @@ function ChannelContent(props: Props) {
   } = useHistory();
   const url = `${pathname}${search}`;
   const claimId = claim && claim.claim_id;
+  const showFilters = !claimType || claimType === 'stream';
 
   function handleInputChange(e) {
     const { value } = e.target;
@@ -68,13 +78,18 @@ function ChannelContent(props: Props) {
         lighthouse
           .search(
             `s=${encodeURIComponent(searchQuery)}&channel_id=${encodeURIComponent(claimId)}${
-              !showMature ? '&nsfw=false&size=25&from=0' : ''
+              !showMature ? '&nsfw=false&size=50&from=0' : ''
             }`
           )
-          .then(results => {
+          .then((results) => {
             const urls = results.map(({ name, claimId }) => {
               return `lbry://${name}#${claimId}`;
             });
+
+            // Batch-resolve the urls before calling 'setSearchResults', as the
+            // latter will immediately cause the tiles to resolve, ending up
+            // calling doResolveUri one by one before the batched one.
+            doResolveUris(urls, true);
 
             setSearchResults(urls);
           })
@@ -97,6 +112,8 @@ function ChannelContent(props: Props) {
         <HiddenNsfwClaims uri={uri} />
       )}
 
+      <LivestreamLink uri={uri} />
+
       {!fetching && channelIsBlackListed && (
         <section className="card card--section">
           <p>
@@ -118,20 +135,24 @@ function ChannelContent(props: Props) {
 
       {!channelIsMine && claimsInChannel > 0 && <HiddenNsfwClaims uri={uri} />}
 
-      {claim && claimsInChannel > 0 ? (
-        <ClaimListDiscover
-          forceShowReposts
-          tileLayout={tileLayout}
-          uris={searchResults}
-          channelIds={[claim.claim_id]}
-          claimType={CS.CLAIM_TYPES}
-          feeAmount={CS.FEE_AMOUNT_ANY}
-          defaultOrderBy={CS.ORDER_BY_NEW}
-          pageSize={defaultPageSize}
-          streamType={CS.CONTENT_ALL}
-          infiniteScroll={defaultInfiniteScroll}
-          injectedItem={SHOW_ADS && !isAuthenticated && IS_WEB && <Ads type="video" />}
-          meta={
+      <ClaimListDiscover
+        showNoSourceClaims={ENABLE_NO_SOURCE_CLAIMS}
+        defaultFreshness={CS.FRESH_ALL}
+        showHiddenByUser={viewHiddenChannels}
+        forceShowReposts
+        hideFilters={!showFilters}
+        hideAdvancedFilter={!showFilters}
+        tileLayout={tileLayout}
+        uris={searchResults}
+        channelIds={[claim.claim_id]}
+        claimType={claimType}
+        feeAmount={CS.FEE_AMOUNT_ANY}
+        defaultOrderBy={CS.ORDER_BY_NEW}
+        pageSize={defaultPageSize}
+        infiniteScroll={defaultInfiniteScroll}
+        injectedItem={SHOW_ADS && !isAuthenticated && IS_WEB && <Ads type="video" />}
+        meta={
+          showFilters && (
             <Form onSubmit={() => {}} className="wunderbar--inline">
               <Icon icon={ICONS.SEARCH} />
               <FormField
@@ -142,11 +163,12 @@ function ChannelContent(props: Props) {
                 placeholder={__('Search')}
               />
             </Form>
-          }
-        />
-      ) : (
-        <section className="main--empty">{__("This channel hasn't published anything yet")}</section>
-      )}
+          )
+        }
+        isChannel
+        channelIsMine={channelIsMine}
+        empty={empty}
+      />
     </Fragment>
   );
 }

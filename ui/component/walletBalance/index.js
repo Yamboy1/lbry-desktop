@@ -1,5 +1,18 @@
 import { connect } from 'react-redux';
-import { selectBalance, selectClaimsBalance, selectSupportsBalance, selectTipsBalance } from 'lbry-redux';
+import {
+  selectBalance,
+  selectClaimsBalance,
+  selectSupportsBalance,
+  selectTipsBalance,
+  selectIsFetchingUtxoCounts,
+  selectUtxoCounts,
+  doFetchUtxoCounts,
+  doUtxoConsolidate,
+  selectIsConsolidatingUtxos,
+  selectIsMassClaimingTips,
+  selectPendingConsolidateTxid,
+  selectPendingMassClaimTxid,
+} from 'lbry-redux';
 import { doOpenModal } from 'redux/actions/app';
 import { selectSyncHash } from 'redux/selectors/sync';
 import { selectClaimedRewards } from 'redux/selectors/rewards';
@@ -12,8 +25,16 @@ const select = state => ({
   tipsBalance: selectTipsBalance(state) || 0,
   rewards: selectClaimedRewards(state),
   hasSynced: Boolean(selectSyncHash(state)),
+  fetchingUtxoCounts: selectIsFetchingUtxoCounts(state),
+  consolidatingUtxos: selectIsConsolidatingUtxos(state),
+  massClaimingTips: selectIsMassClaimingTips(state),
+  utxoCounts: selectUtxoCounts(state),
+  consolidateIsPending: selectPendingConsolidateTxid(state),
+  massClaimIsPending: selectPendingMassClaimTxid(state),
 });
 
 export default connect(select, {
   doOpenModal,
+  doFetchUtxoCounts,
+  doUtxoConsolidate,
 })(WalletBalance);

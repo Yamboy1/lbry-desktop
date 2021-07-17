@@ -1,5 +1,6 @@
 const {
   URL,
+  DOMAIN,
   SITE_TITLE,
   SITE_CANONICAL_URL,
   OG_HOMEPAGE_TITLE,
@@ -8,12 +9,15 @@ const {
   SITE_DESCRIPTION,
   SITE_NAME,
 } = require('../../config.js');
-const { generateEmbedUrl, generateStreamUrl } = require('../../ui/util/web');
+const { generateEmbedUrl, generateStreamUrl, generateDirectUrl } = require('../../ui/util/web');
 const PAGES = require('../../ui/constants/pages');
+const { CATEGORY_METADATA } = require('./category-metadata');
 const { getClaim } = require('./chainquery');
 const { parseURI } = require('lbry-redux');
 const fs = require('fs');
 const path = require('path');
+const moment = require('moment');
+const removeMd = require('remove-markdown');
 const { getJsBundleId } = require('../bundle-id.js');
 const jsBundleId = getJsBundleId();
 
@@ -42,29 +46,51 @@ function escapeHtmlProperty(property) {
     : '';
 }
 
+function getCategoryMeta(path) {
+  const page = Object.keys(CATEGORY_METADATA).find((x) => path.endsWith(x) || path.endsWith(`${x}/`));
+  return CATEGORY_METADATA[page];
+}
+
 //
 // Normal metadata with option to override certain values
 //
 function buildOgMetadata(overrideOptions = {}) {
-  const { title, description } = overrideOptions;
+  const { title, description, image } = overrideOptions;
+  const cleanDescription = removeMd(description || SITE_DESCRIPTION);
   const head =
     `<title>${SITE_TITLE}</title>\n` +
     `<meta property="og:url" content="${URL}" />\n` +
     `<meta property="og:title" content="${title || OG_HOMEPAGE_TITLE || SITE_TITLE}" />\n` +
     `<meta property="og:site_name" content="${SITE_NAME || SITE_TITLE}"/>\n` +
-    `<meta property="og:description" content="${description || SITE_DESCRIPTION}" />\n` +
-    `<meta property="og:image" content="${OG_IMAGE_URL || `${URL}/public/v2-og.png`}" />\n` +
+    `<meta property="og:description" content="${cleanDescription}" />\n` +
+    `<meta property="og:image" content="${image || OG_IMAGE_URL || `${URL}/public/v2-og.png`}" />\n` +
     '<meta name="twitter:card" content="summary_large_image"/>\n' +
-    `<meta name="twitter:title" content="${(title && title + OG_TITLE_SUFFIX) ||
-      OG_HOMEPAGE_TITLE ||
-      SITE_TITLE}" />\n` +
-    `<meta name="twitter:description" content="${description || SITE_DESCRIPTION}" />\n` +
-    `<meta name="twitter:image" content="${OG_IMAGE_URL || `${URL}/public/v2-og.png`}"/>\n` +
+    `<meta name="twitter:title" content="${
+      (title && title + ' ' + OG_TITLE_SUFFIX) || OG_HOMEPAGE_TITLE || SITE_TITLE
+    }" />\n` +
+    `<meta name="twitter:description" content="${cleanDescription}" />\n` +
+    `<meta name="twitter:image" content="${image || OG_IMAGE_URL || `${URL}/public/v2-og.png`}"/>\n` +
     `<meta name="twitter:url" content="${URL}" />\n` +
     '<meta property="fb:app_id" content="1673146449633983" />\n' +
     `<link rel="canonical" content="${SITE_CANONICAL_URL || URL}"/>` +
-    `<link rel="search" type="application/opensearchdescription+xml" title="${SITE_NAME ||
-      SITE_TITLE}" href="${URL}/opensearch.xml">`;
+    `<link rel="search" type="application/opensearchdescription+xml" title="${
+      SITE_NAME || SITE_TITLE
+    }" href="${URL}/opensearch.xml">`;
+  return head;
+}
+
+function conditionallyAddPWA() {
+  let head = '';
+  if (DOMAIN === 'odysee.com') {
+    head +=  '<link rel="manifest" href="./public/pwa/manifest.json"/>';
+    head += '<link rel="apple-touch-icon" sizes="180x180" href="./public/pwa/icon-180.png">';
+    head += '<script src="./serviceWorker.js"></script>';
+  }
+  return head;
+}
+
+function buildHead() {
+  const head = '<!-- VARIABLE_HEAD_BEGIN -->' + conditionallyAddPWA() + buildOgMetadata() + '<!-- VARIABLE_HEAD_END -->';
   return head;
 }
 
@@ -92,23 +118,25 @@ function buildClaimOgMetadata(uri, claim, overrideOptions = {}) {
   if (Number(claim.fee) <= 0 && claim.source_media_type && claim.source_media_type.startsWith('image/')) {
     imageThumbnail = generateStreamUrl(claim.name, claim.claim_id);
   }
-  const claimThumbnail = escapeHtmlProperty(claim.thumbnail_url) || imageThumbnail || `${URL}/public/v2-og.png`;
+  const claimThumbnail =
+    escapeHtmlProperty(claim.thumbnail_url) || imageThumbnail || OG_IMAGE_URL || `${URL}/public/v2-og.png`;
 
   // Allow for ovverriding default claim based og metadata
   const title = overrideOptions.title || claimTitle;
   const description = overrideOptions.description || claimDescription;
+  const cleanDescription = removeMd(description);
 
   let head = '';
 
   head += '<meta charset="utf8"/>';
   head += `<title>${title}</title>`;
-  head += `<meta name="description" content="${description}"/>`;
+  head += `<meta name="description" content="${cleanDescription}"/>`;
   if (claim.tags) {
     head += `<meta name="keywords" content="${claim.tags.toString()}"/>`;
   }
 
   head += `<meta name="twitter:image" content="${claimThumbnail}"/>`;
-  head += `<meta property="og:description" content="${description}"/>`;
+  head += `<meta property="og:description" content="${cleanDescription}"/>`;
   head += `<meta property="og:image" content="${claimThumbnail}"/>`;
   head += `<meta property="og:locale" content="${claimLanguage}"/>`;
   head += `<meta property="og:site_name" content="${SITE_NAME}"/>`;
@@ -155,7 +183,49 @@ function buildClaimOgMetadata(uri, claim, overrideOptions = {}) {
   return head;
 }
 
-async function getClaimFromChainqueryOrRedirect(ctx, url) {
+function buildGoogleVideoMetadata(claimUri, claim) {
+  if (!claim.source_media_type || !claim.source_media_type.startsWith('video/')) {
+    return '';
+  }
+
+  const { claimName } = parseURI(claimUri);
+  const claimTitle = escapeHtmlProperty(claim.title ? claim.title : claimName);
+  const claimDescription =
+    claim.description && claim.description.length > 0
+      ? escapeHtmlProperty(truncateDescription(claim.description))
+      : `View ${claimTitle} on ${SITE_NAME}`;
+  const claimThumbnail = escapeHtmlProperty(claim.thumbnail_url) || OG_IMAGE_URL || `${URL}/public/v2-og.png`;
+  const releaseTime = claim.release_time || 0;
+
+  // https://developers.google.com/search/docs/data-types/video
+  const googleVideoMetadata = {
+    // --- Must ---
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: `${claimTitle}`,
+    description: `${removeMd(claimDescription)}`,
+    thumbnailUrl: `${claimThumbnail}`,
+    uploadDate: `${new Date(releaseTime * 1000).toISOString()}`,
+    // --- Recommended ---
+    duration: claim.duration ? moment.duration(claim.duration * 1000).toISOString() : undefined,
+    contentUrl: generateDirectUrl(claim.name, claim.claim_id),
+    embedUrl: generateEmbedUrl(claim.name, claim.claim_id),
+  };
+
+  if (
+    !googleVideoMetadata.description.replace(/\s/g, '').length ||
+    googleVideoMetadata.thumbnailUrl.startsWith('data:image') ||
+    !googleVideoMetadata.thumbnailUrl.startsWith('http')
+  ) {
+    return '';
+  }
+
+  return (
+    '<script type="application/ld+json">\n' + JSON.stringify(googleVideoMetadata, null, '  ') + '\n' + '</script>\n'
+  );
+}
+
+async function getClaimFromChainqueryOrRedirect(ctx, url, ignoreRedirect = false) {
   const { isChannel, streamName, channelName, channelClaimId, streamClaimId } = parseURI(url);
   const claimName = isChannel ? '@' + channelName : streamName;
   const claimId = isChannel ? channelClaimId : streamClaimId;
@@ -164,7 +234,7 @@ async function getClaimFromChainqueryOrRedirect(ctx, url) {
   if (rows && rows.length) {
     const claim = rows[0];
 
-    if (claim.reposted_name && claim.reposted_claim_id) {
+    if (claim.reposted_name && claim.reposted_claim_id && !ignoreRedirect) {
       ctx.redirect(`/${claim.reposted_name}:${claim.reposted_claim_id}`);
       return;
     }
@@ -216,14 +286,25 @@ async function getHtml(ctx) {
 
   if (requestPath.includes(embedPath)) {
     const claimUri = requestPath.replace(embedPath, '').replace(/:/g, '#');
-    const claim = await getClaimFromChainqueryOrRedirect(ctx, claimUri);
+    const claim = await getClaimFromChainqueryOrRedirect(ctx, claimUri, true);
 
     if (claim) {
       const ogMetadata = buildClaimOgMetadata(claimUri, claim);
-      return insertToHead(html, ogMetadata);
+      const googleVideoMetadata = buildGoogleVideoMetadata(claimUri, claim);
+      return insertToHead(html, ogMetadata.concat('\n', googleVideoMetadata));
     }
 
     return insertToHead(html);
+  }
+
+  const categoryMeta = getCategoryMeta(requestPath);
+  if (categoryMeta) {
+    const categoryPageMetadata = buildOgMetadata({
+      title: categoryMeta.title,
+      description: categoryMeta.description,
+      image: categoryMeta.image,
+    });
+    return insertToHead(html, categoryPageMetadata);
   }
 
   if (!requestPath.includes('$')) {
@@ -232,12 +313,13 @@ async function getHtml(ctx) {
 
     if (claim) {
       const ogMetadata = buildClaimOgMetadata(claimUri, claim);
-      return insertToHead(html, ogMetadata);
+      const googleVideoMetadata = buildGoogleVideoMetadata(claimUri, claim);
+      return insertToHead(html, ogMetadata.concat('\n', googleVideoMetadata));
     }
   }
 
-  const ogMetadata = buildBasicOgMetadata();
-  return insertToHead(html, ogMetadata);
+  const ogMetadataAndPWA = buildHead();
+  return insertToHead(html, ogMetadataAndPWA);
 }
 
-module.exports = { insertToHead, buildBasicOgMetadata, getHtml };
+module.exports = { insertToHead, buildHead, getHtml };

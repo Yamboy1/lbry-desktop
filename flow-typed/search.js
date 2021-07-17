@@ -14,11 +14,22 @@ declare type SearchOptions = {
   MEDIA_TEXT: string,
   MEDIA_IMAGE: string,
   MEDIA_APPLICATION: string,
+  SORT: string,
+  SORT_ACCENDING: string,
+  SORT_DESCENDING: string,
+  EXACT: string,
+  TIME_FILTER: string,
+  TIME_FILTER_LAST_HOUR: string,
+  TIME_FILTER_TODAY: string,
+  TIME_FILTER_THIS_WEEK: string,
+  TIME_FILTER_THIS_MONTH: string,
+  TIME_FILTER_THIS_YEAR: string,
 };
 
 declare type SearchState = {
   options: SearchOptions,
   urisByQuery: {},
+  hasReachedMaxResultsLength: {},
   searching: boolean,
 };
 
@@ -26,6 +37,8 @@ declare type SearchSuccess = {
   type: ACTIONS.SEARCH_SUCCESS,
   data: {
     query: string,
+    from: number,
+    size: number,
     uris: Array<string>,
   },
 };

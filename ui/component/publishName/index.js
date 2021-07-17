@@ -3,33 +3,26 @@ import {
   makeSelectPublishFormValue,
   selectIsStillEditing,
   selectMyClaimForUri,
-  selectIsResolvingPublishUris,
-  selectTakeOverAmount,
   doUpdatePublishForm,
   doPrepareEdit,
-  selectBalance,
 } from 'lbry-redux';
-
+import { selectActiveChannelClaim, selectIncognito } from 'redux/selectors/app';
+import { doSetActiveChannel } from 'redux/actions/app';
 import PublishPage from './view';
 
-const select = state => ({
+const select = (state) => ({
   name: makeSelectPublishFormValue('name')(state),
-  channel: makeSelectPublishFormValue('channel')(state),
-  bid: makeSelectPublishFormValue('bid')(state),
   uri: makeSelectPublishFormValue('uri')(state),
   isStillEditing: selectIsStillEditing(state),
-  isResolvingUri: selectIsResolvingPublishUris(state),
-  amountNeededForTakeover: selectTakeOverAmount(state),
-  balance: selectBalance(state),
   myClaimForUri: selectMyClaimForUri(state),
+  activeChannelClaim: selectActiveChannelClaim(state),
+  incognito: selectIncognito(state),
 });
 
-const perform = dispatch => ({
-  updatePublishForm: value => dispatch(doUpdatePublishForm(value)),
+const perform = (dispatch) => ({
+  updatePublishForm: (value) => dispatch(doUpdatePublishForm(value)),
   prepareEdit: (claim, uri) => dispatch(doPrepareEdit(claim, uri)),
+  setActiveChannel: (claimId) => dispatch(doSetActiveChannel(claimId)),
 });
 
-export default connect(
-  select,
-  perform
-)(PublishPage);
+export default connect(select, perform)(PublishPage);

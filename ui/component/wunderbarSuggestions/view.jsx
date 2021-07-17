@@ -1,5 +1,6 @@
 // @flow
-import { URL, URL_LOCAL, URL_DEV } from 'config';
+import type { ElementRef } from 'react';
+import { URL, URL_LOCAL, URL_DEV, KNOWN_APP_DOMAINS } from 'config';
 import * as PAGES from 'constants/pages';
 import * as ICONS from 'constants/icons';
 import React from 'react';
@@ -7,7 +8,7 @@ import classnames from 'classnames';
 import Icon from 'component/common/icon';
 import { isURIValid, normalizeURI, parseURI } from 'lbry-redux';
 import { Combobox, ComboboxInput, ComboboxPopover, ComboboxList, ComboboxOption } from '@reach/combobox';
-import '@reach/combobox/styles.css';
+// import '@reach/combobox/styles.css'; --> 'scss/third-party.scss'
 import useLighthouse from 'effects/use-lighthouse';
 import { Form } from 'component/common/form';
 import Button from 'component/button';
@@ -15,31 +16,55 @@ import WunderbarTopSuggestion from 'component/wunderbarTopSuggestion';
 import WunderbarSuggestion from 'component/wunderbarSuggestion';
 import { useHistory } from 'react-router';
 import { formatLbryUrlForWeb } from 'util/url';
-import useThrottle from 'effects/use-throttle';
 import Yrbl from 'component/yrbl';
+import { SEARCH_OPTIONS } from 'constants/search';
+import Spinner from 'component/spinner';
 
+const LBRY_PROTOCOL = 'lbry://';
 const WEB_DEV_PREFIX = `${URL_DEV}/`;
 const WEB_LOCAL_PREFIX = `${URL_LOCAL}/`;
 const WEB_PROD_PREFIX = `${URL}/`;
 const SEARCH_PREFIX = `$/${PAGES.SEARCH}q=`;
 const INVALID_URL_ERROR = "Invalid LBRY URL entered. Only A-Z, a-z, 0-9, and '-' allowed.";
+const TAG_SEARCH_PREFIX = 'tag:';
 
 const L_KEY_CODE = 76;
 const ESC_KEY_CODE = 27;
 
+const WUNDERBAR_INPUT_DEBOUNCE_MS = 1000;
+const LIGHTHOUSE_MIN_CHARACTERS = 3;
+
 type Props = {
   searchQuery: ?string,
-  onSearch: string => void,
-  navigateToSearchPage: string => void,
-  doResolveUris: string => void,
-  doShowSnackBar: string => void,
+  onSearch: (string) => void,
+  navigateToSearchPage: (string) => void,
+  doResolveUris: (string) => void,
+  doShowSnackBar: (string) => void,
   showMature: boolean,
   isMobile: boolean,
+  doCloseMobileSearch: () => void,
+  channelsOnly?: boolean,
+  noTopSuggestion?: boolean,
+  noBottomLinks?: boolean,
+  customSelectAction?: (string) => void,
 };
 
 export default function WunderBarSuggestions(props: Props) {
-  const { navigateToSearchPage, doShowSnackBar, doResolveUris, showMature, isMobile } = props;
-  const inputRef = React.useRef();
+  const {
+    navigateToSearchPage,
+    doShowSnackBar,
+    doResolveUris,
+    showMature,
+    isMobile,
+    doCloseMobileSearch,
+    channelsOnly,
+    noTopSuggestion,
+    noBottomLinks,
+    customSelectAction,
+  } = props;
+  const inputRef: ElementRef<any> = React.useRef();
+  const isFocused = inputRef && inputRef.current && inputRef.current === document.activeElement;
+
   const {
     push,
     location: { search },
@@ -47,14 +72,14 @@ export default function WunderBarSuggestions(props: Props) {
   const urlParams = new URLSearchParams(search);
   const queryFromUrl = urlParams.get('q') || '';
   const [term, setTerm] = React.useState(queryFromUrl);
-  const throttledTerm = useThrottle(term, 500) || '';
+  const [debouncedTerm, setDebouncedTerm] = React.useState('');
   const searchSize = isMobile ? 20 : 5;
-  const { results, loading } = useLighthouse(throttledTerm, showMature, searchSize);
-  const noResults = throttledTerm && !loading && results && results.length === 0;
-  const nameFromQuery = throttledTerm
-    .trim()
-    .replace(/\s+/g, '')
-    .replace(/:/g, '#');
+  const additionalOptions = channelsOnly
+    ? { isBackgroundSearch: false, [SEARCH_OPTIONS.CLAIM_TYPE]: SEARCH_OPTIONS.INCLUDE_CHANNELS }
+    : {};
+  const { results, loading } = useLighthouse(debouncedTerm, showMature, searchSize, additionalOptions, 0);
+  const noResults = debouncedTerm && !loading && results && results.length === 0;
+  const nameFromQuery = debouncedTerm.trim().replace(/\s+/g, '').replace(/:/g, '#');
   const uriFromQuery = `lbry://${nameFromQuery}`;
   let uriFromQueryIsValid = false;
   let channelUrlForTopTest;
@@ -71,26 +96,34 @@ export default function WunderBarSuggestions(props: Props) {
     topUrisToTest.push(uriFromQuery);
   }
 
+  const isTyping = debouncedTerm !== term;
+  const showPlaceholder = isTyping || loading;
+
   function handleSelect(value) {
     if (!value) {
       return;
     }
 
-    const includesLbryTvProd = value.includes(WEB_PROD_PREFIX);
-    const includesLbryTvLocal = value.includes(WEB_LOCAL_PREFIX);
-    const includesLbryTvDev = value.includes(WEB_DEV_PREFIX);
-    const wasCopiedFromWeb = includesLbryTvDev || includesLbryTvLocal || includesLbryTvProd;
+    doCloseMobileSearch();
+
+    const knownAppDomains = KNOWN_APP_DOMAINS.map((x) => `https://${x}/`); // Match WEB_PROD_PREFIX's 'https://xx/' format.
+    const webDomainList = [WEB_PROD_PREFIX, ...knownAppDomains, WEB_LOCAL_PREFIX, WEB_DEV_PREFIX];
+    const webDomainIndex = webDomainList.findIndex((x) => value.includes(x));
+    const wasCopiedFromWeb = webDomainIndex !== -1;
     const isLbryUrl = value.startsWith('lbry://');
 
     if (inputRef.current) {
       inputRef.current.blur();
     }
 
-    if (wasCopiedFromWeb) {
-      let prefix = WEB_PROD_PREFIX;
-      if (includesLbryTvLocal) prefix = WEB_LOCAL_PREFIX;
-      if (includesLbryTvDev) prefix = WEB_DEV_PREFIX;
+    if (customSelectAction) {
+      // Give them full results, as our resolved one might truncate the claimId.
+      customSelectAction(results ? results.find((r) => r.startsWith(value)) : '');
+      return;
+    }
 
+    if (wasCopiedFromWeb) {
+      const prefix = webDomainList[webDomainIndex];
       let query = value.slice(prefix.length).replace(/:/g, '#');
 
       if (query.includes(SEARCH_PREFIX)) {
@@ -108,12 +141,16 @@ export default function WunderBarSuggestions(props: Props) {
       }
     }
 
-    if (!isLbryUrl) {
+    if (value.startsWith(TAG_SEARCH_PREFIX)) {
+      const tag = value.slice(TAG_SEARCH_PREFIX.length);
+      push(`/$/${PAGES.DISCOVER}?t=${tag}`);
+    } else if (!isLbryUrl) {
       navigateToSearchPage(value);
     } else {
+      let query = 'lbry://' + value.slice(LBRY_PROTOCOL.length).replace(/:/g, '#');
       try {
-        if (isURIValid(value)) {
-          const uri = normalizeURI(value);
+        if (isURIValid(query)) {
+          const uri = normalizeURI(query);
           const normalizedWebUrl = formatLbryUrlForWeb(uri);
           push(normalizedWebUrl);
         } else {
@@ -124,6 +161,68 @@ export default function WunderBarSuggestions(props: Props) {
       }
     }
   }
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (debouncedTerm !== term) {
+        setDebouncedTerm(term.length < LIGHTHOUSE_MIN_CHARACTERS ? '' : term);
+      }
+    }, WUNDERBAR_INPUT_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [term, debouncedTerm]);
+
+  React.useEffect(() => {
+    function handleHomeEndCaretPos(elem, shiftKey, isHome) {
+      if (elem) {
+        const cur = elem.selectionStart ? elem.selectionStart : 0;
+        let begin;
+        let final;
+        let scrollPx;
+        let direction = 'none';
+
+        if (isHome) {
+          begin = 0;
+          final = shiftKey ? cur : begin;
+          scrollPx = 0;
+          direction = 'backward';
+        } else {
+          final = elem.value.length;
+          begin = shiftKey ? cur : final;
+          scrollPx = elem.scrollWidth - elem.clientWidth;
+        }
+
+        elem.setSelectionRange(begin, final, direction);
+        elem.scrollLeft = scrollPx;
+        return true;
+      }
+
+      return false;
+    }
+
+    function overrideHomeEndHandling(event) {
+      const { ctrlKey, metaKey, shiftKey, key } = event;
+      if (!ctrlKey && !metaKey) {
+        if (key === 'Home' || key === 'End') {
+          if (handleHomeEndCaretPos(inputRef.current, shiftKey, key === 'Home')) {
+            event.stopPropagation();
+          }
+        }
+      }
+    }
+
+    // Injecting the listener at the element level puts it before
+    // ReachUI::ComboBoxInput's listener, allowing us to skip their handling.
+    if (inputRef.current) {
+      inputRef.current.addEventListener('keydown', overrideHomeEndHandling);
+    }
+
+    return () => {
+      if (inputRef.current) {
+        inputRef.current.removeEventListener('keydown', overrideHomeEndHandling);
+      }
+    };
+  }, [inputRef]);
 
   React.useEffect(() => {
     function handleKeyDown(event) {
@@ -147,7 +246,27 @@ export default function WunderBarSuggestions(props: Props) {
     }
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    // @if TARGET='app'
+    function handleDoubleClick(event) {
+      if (!inputRef.current) {
+        return;
+      }
+
+      event.stopPropagation();
+    }
+
+    inputRef.current.addEventListener('dblclick', handleDoubleClick);
+    // @endif
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      // @if TARGET='app'
+      if (inputRef.current) {
+        inputRef.current.removeEventListener('dblclick', handleDoubleClick);
+      }
+      // @endif
+    };
   }, [inputRef]);
 
   React.useEffect(() => {
@@ -178,25 +297,39 @@ export default function WunderBarSuggestions(props: Props) {
             ref={inputRef}
             className="wunderbar__input"
             placeholder={__('Search')}
-            onChange={e => setTerm(e.target.value)}
+            onChange={(e) => setTerm(e.target.value)}
             value={term}
           />
 
-          {results && results.length > 0 && (
+          {isFocused && (
             <ComboboxPopover
               portal={false}
               className={classnames('wunderbar__suggestions', { 'wunderbar__suggestions--mobile': isMobile })}
             >
               <ComboboxList>
-                {uriFromQueryIsValid ? <WunderbarTopSuggestion query={nameFromQuery} /> : null}
+                {uriFromQueryIsValid && !noTopSuggestion ? <WunderbarTopSuggestion query={nameFromQuery} /> : null}
 
                 <div className="wunderbar__label">{__('Search Results')}</div>
-                {results.slice(0, isMobile ? 20 : 5).map(uri => (
-                  <WunderbarSuggestion key={uri} uri={uri} />
-                ))}
-                <ComboboxOption value={term} className="wunderbar__more-results">
-                  <Button button="link" label={__('View All Results')} />
-                </ComboboxOption>
+
+                {showPlaceholder && term.length > LIGHTHOUSE_MIN_CHARACTERS ? <Spinner type="small" /> : null}
+
+                {!showPlaceholder && results
+                  ? results.slice(0, isMobile ? 20 : 5).map((uri) => <WunderbarSuggestion key={uri} uri={uri} />)
+                  : null}
+
+                {!noBottomLinks && (
+                  <div className="wunderbar__bottom-links">
+                    <ComboboxOption value={term} className="wunderbar__more-results">
+                      <Button button="link" label={__('View All Results')} />
+                    </ComboboxOption>
+                    <ComboboxOption value={`${TAG_SEARCH_PREFIX}${term}`} className="wunderbar__more-results">
+                      <Button className="wunderbar__tag-search" button="link">
+                        {__('Explore')}
+                        <div className="tag">{term.split(' ').join('')}</div>
+                      </Button>
+                    </ComboboxOption>
+                  </div>
+                )}
               </ComboboxList>
             </ComboboxPopover>
           )}

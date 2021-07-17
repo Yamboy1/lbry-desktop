@@ -10,7 +10,7 @@ import { createMemoryHistory, createBrowserHistory } from 'history';
 import { routerMiddleware } from 'connected-react-router';
 import createRootReducer from './reducers';
 import { Lbry, buildSharedStateMiddleware, ACTIONS as LBRY_REDUX_ACTIONS } from 'lbry-redux';
-import { doSyncSubscribe } from 'redux/actions/sync';
+import { doSyncLoop } from 'redux/actions/sync';
 import { getAuthToken } from 'util/saved-passwords';
 import { generateInitialUrl } from 'util/url';
 import { X_LBRY_AUTH_TOKEN } from 'constants/token';
@@ -24,9 +24,9 @@ function isNotFunction(object) {
 }
 
 function createBulkThunkMiddleware() {
-  return ({ dispatch, getState }) => next => action => {
+  return ({ dispatch, getState }) => (next) => (action) => {
     if (action.type === 'BATCH_ACTIONS') {
-      action.actions.filter(isFunction).map(actionFn => actionFn(dispatch, getState));
+      action.actions.filter(isFunction).map((actionFn) => actionFn(dispatch, getState));
     }
     return next(action);
   };
@@ -58,17 +58,20 @@ const appFilter = createFilter('app', [
   'welcomeVersion',
   'interestedInYoutubeSync',
   'splashAnimationEnabled',
+  'activeChannel',
 ]);
+const claimsFilter = createFilter('claims', ['pendingById']);
 // We only need to persist the receiveAddress for the wallet
 const walletFilter = createFilter('wallet', ['receiveAddress']);
-const commentsFilter = createFilter('comments', ['commentChannel']);
 const searchFilter = createFilter('search', ['options']);
 const tagsFilter = createFilter('tags', ['followedTags']);
 const subscriptionsFilter = createFilter('subscriptions', ['subscriptions']);
 const blockedFilter = createFilter('blocked', ['blockedChannels']);
+const coinSwapsFilter = createFilter('coinSwap', ['coinSwaps']);
 const settingsFilter = createBlacklistFilter('settings', ['loadedLanguages', 'language']);
+const collectionsFilter = createFilter('collections', ['builtin', 'saved', 'unpublished', 'edited', 'pending']);
 const whiteListedReducers = [
-  'comments',
+  'claims',
   'fileInfo',
   'publish',
   'wallet',
@@ -77,15 +80,18 @@ const whiteListedReducers = [
   'app',
   'search',
   'blocked',
+  'coinSwap',
   'settings',
   'subscriptions',
+  'collections',
 ];
 
 const transforms = [
-  commentsFilter,
+  claimsFilter,
   fileInfoFilter,
   walletFilter,
   blockedFilter,
+  coinSwapsFilter,
   tagsFilter,
   appFilter,
   searchFilter,
@@ -93,6 +99,7 @@ const transforms = [
   contentFilter,
   subscriptionsFilter,
   settingsFilter,
+  collectionsFilter,
   createCompressor(),
 ];
 
@@ -121,11 +128,18 @@ const triggerSharedStateActions = [
   ACTIONS.CHANNEL_SUBSCRIBE,
   ACTIONS.CHANNEL_UNSUBSCRIBE,
   ACTIONS.TOGGLE_BLOCK_CHANNEL,
+  ACTIONS.ADD_COIN_SWAP,
+  ACTIONS.REMOVE_COIN_SWAP,
   ACTIONS.TOGGLE_TAG_FOLLOW,
   LBRY_REDUX_ACTIONS.CREATE_CHANNEL_COMPLETED,
   ACTIONS.SYNC_CLIENT_SETTINGS,
   // Disabled until we can overwrite preferences
   LBRY_REDUX_ACTIONS.SHARED_PREFERENCE_SET,
+  LBRY_REDUX_ACTIONS.COLLECTION_EDIT,
+  LBRY_REDUX_ACTIONS.COLLECTION_DELETE,
+  LBRY_REDUX_ACTIONS.COLLECTION_NEW,
+  LBRY_REDUX_ACTIONS.COLLECTION_PENDING,
+  // MAYBE COLLECTOIN SAVE
   // ACTIONS.SET_WELCOME_VERSION,
   // ACTIONS.SET_ALLOW_ANALYTICS,
 ];
@@ -144,7 +158,7 @@ const sharedStateFilters = {
   subscriptions: {
     source: 'subscriptions',
     property: 'subscriptions',
-    transform: function(value) {
+    transform: (value) => {
       return value.map(({ uri }) => uri);
     },
   },
@@ -153,17 +167,27 @@ const sharedStateFilters = {
     property: 'following',
   },
   blocked: { source: 'blocked', property: 'blockedChannels' },
+  coin_swap_codes: {
+    source: 'coinSwap',
+    property: 'coinSwaps',
+    transform: (coinSwaps) => {
+      return coinSwaps.map((coinSwapInfo) => coinSwapInfo.chargeCode);
+    },
+  },
   settings: { source: 'settings', property: 'sharedPreferences' },
   app_welcome_version: { source: 'app', property: 'welcomeVersion' },
   sharing_3P: { source: 'app', property: 'allowAnalytics' },
+  builtinCollections: { source: 'collections', property: 'builtin' },
+  // savedCollections: { source: 'collections', property: 'saved' },
+  unpublishedCollections: { source: 'collections', property: 'unpublished' },
 };
 
 const sharedStateCb = ({ dispatch, getState }) => {
-  dispatch(doSyncSubscribe());
+  dispatch(doSyncLoop());
 };
 
 const populateAuthTokenHeader = () => {
-  return next => action => {
+  return (next) => (action) => {
     if (
       (action.type === ACTIONS.USER_FETCH_SUCCESS || action.type === ACTIONS.AUTHENTICATION_SUCCESS) &&
       action.data.user.has_verified_email === true

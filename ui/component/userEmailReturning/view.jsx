@@ -1,5 +1,5 @@
 // @flow
-import { SITE_NAME } from 'config';
+import { SITE_NAME, SIMPLE_SITE } from 'config';
 import * as PAGES from 'constants/pages';
 import React, { useState } from 'react';
 import { FormField, Form } from 'component/common/form';
@@ -9,6 +9,8 @@ import { useHistory } from 'react-router-dom';
 import UserEmailVerify from 'component/userEmailVerify';
 import Card from 'component/common/card';
 import Nag from 'component/common/nag';
+import classnames from 'classnames';
+import LoginGraphic from 'component/loginGraphic';
 
 type Props = {
   user: ?User,
@@ -17,8 +19,8 @@ type Props = {
   emailDoesNotExist: boolean,
   doClearEmailEntry: () => void,
   doUserSignIn: (string, ?string) => void,
-  doUserCheckIfEmailExists: string => void,
-  doSetWalletSyncPreference: boolean => void,
+  doUserCheckIfEmailExists: (string) => void,
+  doSetWalletSyncPreference: (boolean) => void,
   doSetClientSetting: (string, boolean, ?boolean) => void,
   isPending: boolean,
 };
@@ -69,7 +71,11 @@ function UserEmailReturning(props: Props) {
   }
 
   return (
-    <div className="main__sign-in">
+    <div
+      className={classnames('main__sign-in', {
+        'main__sign-up--graphic': SIMPLE_SITE && !showEmailVerification,
+      })}
+    >
       {showEmailVerification ? (
         <UserEmailVerify />
       ) : (
@@ -87,7 +93,7 @@ function UserEmailReturning(props: Props) {
                   name="sign_in_email"
                   label={__('Email')}
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
 
                 {/* @if TARGET='app' */}
@@ -119,7 +125,7 @@ function UserEmailReturning(props: Props) {
             </div>
           }
           nag={
-            <React.Fragment>
+            <>
               {!emailDoesNotExist && emailExistsFromUrl && (
                 <Nag type="helpful" relative message={__('That email is already in use. Did you mean to log in?')} />
               )}
@@ -134,8 +140,9 @@ function UserEmailReturning(props: Props) {
               {!emailExistsFromUrl && !emailDoesNotExist && errorMessage && (
                 <Nag type="error" relative message={errorMessage} />
               )}
-            </React.Fragment>
+            </>
           }
+          secondPane={SIMPLE_SITE && <LoginGraphic />}
         />
       )}
     </div>

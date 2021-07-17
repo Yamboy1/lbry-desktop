@@ -10,6 +10,7 @@ type Props = {
   href: string,
   title?: string,
   embed?: boolean,
+  allowPreview?: boolean,
   children: React.Node,
   parentCommentId?: string,
   isMarkdownPost?: boolean,
@@ -17,7 +18,16 @@ type Props = {
 };
 
 function MarkdownLink(props: Props) {
-  const { children, href, title, embed = false, parentCommentId, isMarkdownPost, simpleLinks = false } = props;
+  const {
+    children,
+    href,
+    title,
+    embed = false,
+    allowPreview = false,
+    parentCommentId,
+    isMarkdownPost,
+    simpleLinks = false,
+  } = props;
 
   let decodedUri;
   try {
@@ -56,22 +66,44 @@ function MarkdownLink(props: Props) {
       const possibleLbryUrl = linkPathPlusHash ? `lbry://${linkPathPlusHash.replace(/:/g, '#')}` : undefined;
 
       const lbryLinkIsValid = possibleLbryUrl && isURIValid(possibleLbryUrl);
-      if (lbryLinkIsValid) {
+      const isMarkdownLinkWithLabel =
+        children && Array.isArray(children) && React.Children.count(children) === 1 && children.toString() !== href;
+
+      if (lbryLinkIsValid && !isMarkdownLinkWithLabel) {
         lbryUrlFromLink = possibleLbryUrl;
       }
     }
   }
 
-  // Return plain text if no valid url
-  // Return external link if protocol is http or https
-  // Return local link if protocol is lbry uri
-  if (!simpleLinks && ((protocol && protocol[0] === 'lbry:' && isURIValid(decodedUri)) || lbryUrlFromLink)) {
+  // Return timestamp link if it starts with '?t=' (only possible from remark-timestamp).
+  // Return plain text if no valid url.
+  // Return external link if protocol is http or https.
+  // Return local link if protocol is lbry uri.
+  if (href.startsWith('?t=')) {
+    // Video timestamp markers
+    element = (
+      <Button
+        button="link"
+        iconRight={undefined}
+        title={title || decodedUri}
+        label={children}
+        className="button--external-link"
+        onClick={() => {
+          if (window.player) {
+            window.player.currentTime(parseInt(href.substr(3)));
+            window.scrollTo(0, 0);
+          }
+        }}
+      />
+    );
+  } else if (!simpleLinks && ((protocol && protocol[0] === 'lbry:' && isURIValid(decodedUri)) || lbryUrlFromLink)) {
     element = (
       <ClaimLink
         uri={lbryUrlFromLink || decodedUri}
         autoEmbed={embed}
         parentCommentId={parentCommentId}
         isMarkdownPost={isMarkdownPost}
+        allowPreview={allowPreview}
       >
         {children}
       </ClaimLink>

@@ -1,18 +1,157 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased on desktop]
+## [Unreleased for Desktop]
 
 ### Added
+- Show currently active playing item on playlist _community pr!_ ([#6453](https://github.com/lbryio/lbry-desktop/pull/6453))
+- Add watch later to hover action for last used playlist on popup _community pr!_ ([#6274](https://github.com/lbryio/lbry-desktop/pull/6274))
 
-- Mobile video player enhancements and the ability to tap on the left and right edges to seek _community pr!_ ([#5119](https://github.com/lbryio/lbry-desktop/pull/5119))
+### Changed
+- Use Canonical Url for copy link ([#6500](https://github.com/lbryio/lbry-desktop/pull/6500))
+- Use better icon for copy link ([#6485](https://github.com/lbryio/lbry-desktop/pull/6485))
+- Comments load paginated ([#6390](https://github.com/lbryio/lbry-desktop/pull/6390))
+
+### Fixed
+- App now supports '#' and ':' for claimId separator ([#6496](https://github.com/lbryio/lbry-desktop/pull/6496))
+- Fix "exact match" being applied to Recommended ([#6460](https://github.com/lbryio/lbry-desktop/pull/6460))
+- Fix upload button on creator analytics _community pr!_ ([#6458](https://github.com/lbryio/lbry-desktop/pull/6458))
+- Prevent sidebar shortcut activation on textarea _community pr!_ ([#6454](https://github.com/lbryio/lbry-desktop/pull/6454))
+
+## [0.51.1] - [2021-06-26]
+
+### Added
 
 ### Changed
 
 ### Fixed
+- Enable sign up on desktop ([#6071](https://github.com/lbryio/lbry-desktop/issues/6071))
+
+## [0.51.0] - [2021-06-26]
+
+### Added
+- Private and Publishable Playlists ([#6157](https://github.com/lbryio/lbry-desktop/pull/6157))
+- Channel thumbnails in following side menu ([#6193](https://github.com/lbryio/lbry-desktop/pull/6193))
+- Web is now PWA app ([#6120](https://github.com/lbryio/lbry-desktop/pull/6120))
+- Send a tip with your comment ([#5920](https://github.com/lbryio/lbry-desktop/issues/5920))
+- Search for tags in search dropdown ([#5876](https://github.com/lbryio/lbry-desktop/issues/5876))
+- Japanese, Afrikaans, Filipino, Thai and Vietnamese language support ([#5684](https://github.com/lbryio/lbry-desktop/issues/5684))
+- Brazilian-Portuguese language support ([#5900](https://github.com/lbryio/lbry-desktop/issues/5900))  
+- Highlight comments made by content owner _community pr!_ ([#5744](https://github.com/lbryio/lbry-desktop/pull/5744))
+- Ability to report infringing content directly from the application ([#5808](https://github.com/lbryio/lbry-desktop/pull/5808))
+- Re-added ability to export wallet transactions ([#5899](https://github.com/lbryio/lbry-desktop/pull/5899))
+- 24-hour clock setting _community pr!_ ([#5820](https://github.com/lbryio/lbry-desktop/pull/5820))
+- "Related" (recommendations) section: added option to view more from current creator _community pr!_ ([#5847](https://github.com/lbryio/lbry-desktop/pull/5847))
+- Wallet: ability to swap cryptocurrency into LBC ([#5654](https://github.com/lbryio/lbry-desktop/pull/5654))
+- Wallet: ability to send LBC directly to a user through a name or URL search _community pr!_ ([#5990](https://github.com/lbryio/lbry-desktop/pull/5990))
+- Publish: ability to edit the Release Date field ([#6049](https://github.com/lbryio/lbry-desktop/pull/6049))
+- Creator Settings: ability to mute specific words in comments ([#5934](https://github.com/lbryio/lbry-desktop/pull/5934))
+- Creator Settings: ability to disable comments + assign moderators ([#6199](https://github.com/lbryio/lbry-desktop/pull/6199))
+- Additional options in context-menu _community pr!_ ([#6106](https://github.com/lbryio/lbry-desktop/pull/6106))
+
+### Changed
+
+- Keyboard shortcut additions and changes _community pr!_ ([#5717](https://github.com/lbryio/lbry-desktop/pull/5717))
+- Removed the 10k character-limit when editing _Posts_ ([#5719](https://github.com/lbryio/lbry-desktop/pull/5719))
+- Improved search functionality (more filters, infinite-scroll, etc.) ([#5742](https://github.com/lbryio/lbry-desktop/pull/5742))
+- Removed google related section ads ([#6312](https://github.com/lbryio/lbry-desktop/pull/6312))
+- Debounce and min characters on wunderbar search ([#6319](https://github.com/lbryio/lbry-desktop/pull/6319))
+- Don't use optimizer for gif thumbnails ([#6320](https://github.com/lbryio/lbry-desktop/pull/6320))
+- Upgraded [LBRY SDK 0.99.0](https://github.com/lbryio/lbry/releases/tag/v0.99.0)
+
+### Fixed
+
+- Lazy-load claim images to improve app responsiveness ([#5795](https://github.com/lbryio/lbry-desktop/issues/5795))
+- Fix display of upload date and view count on smaller screens ([#5822](https://github.com/lbryio/lbry-desktop/issues/5822))
+- Autoplay looping to a previous video or itself ([#5711](https://github.com/lbryio/lbry-desktop/pull/5711))
+- Autoplay not working in mini-player mode ([#5716](https://github.com/lbryio/lbry-desktop/pull/5716))
+- Edited claim accidentally moved to 'Anonymous' ([#5767](https://github.com/lbryio/lbry-desktop/pull/5767))
+- Squished "Upload Date" and "View Count" on smaller screens _community pr!_ ([#5823](https://github.com/lbryio/lbry-desktop/pull/5823))
+- Home and End key not working in search bar ([#5867](https://github.com/lbryio/lbry-desktop/pull/5867))
+- Unable to buy paid-Images or Posts ([#6114](https://github.com/lbryio/lbry-desktop/pull/6114))
+
+## [0.50.2] - [2021-04-2]
+
+### Changed
+
+- Disable PDFs until security issue is fixed
+
+## [0.50.1] - [2021-03-18]
+
+### Fixed
+
+- Upgrade modal extended beyond the height of the app ([#5709](https://github.com/lbryio/lbry-desktop/pull/5709))
+
+## [0.50.0] - [2021-03-18]
+
+### Added
+
+- New moderation tools: block & mute ([#5572](https://github.com/lbryio/lbry-desktop/pull/5572))
+- Improved markdown file styling ([#5659](https://github.com/lbryio/lbry-desktop/pull/5659))
+- Mass tip unlock ([#5409](https://github.com/lbryio/lbry-desktop/pull/5387))
+- Zoomable image viewer in Markdown (posts and comments) _community pr!_ ([#5387](https://github.com/lbryio/lbry-desktop/pull/5387))
+- Enable PDF Viewer in App _community pr!_ ([#2903](https://github.com/lbryio/lbry-desktop/issues/2903))
+- The search bar now handles both lbry.tv and Odysee links regardless of which site the user is in ([#5604](https://github.com/lbryio/lbry-desktop/issues/5604))
+- The video/audio player's control tooltip is now localized and includes hints for keyboard shortcuts ([#5584](https://github.com/lbryio/lbry-desktop/issues/5584))
+- Finnish and Norwegian language support ([#5532](https://github.com/lbryio/lbry-desktop/issues/5532))
+
+### Changed
+
+- Updated lbry-sdk to [0.92.0](https://github.com/lbryio/lbry-sdk/releases/tag/v0.92.0)
+- Re-enable PDF Viewer in desktop app _community pr!_ ([#5420](https://github.com/lbryio/lbry-desktop/issues/5420))
+
+### Fixed
+
+- Player doesn't stop playing when editing a comment that includes a video url _community pr!_ ([#5384](https://github.com/lbryio/lbry-desktop/pull/5384))
+- Main video/audio playback stopped every time a comment is edited or deleted ([#5606](https://github.com/lbryio/lbry-desktop/pull/5606))
+- Winning search result not working correctly with mature content enabled _community pr!_ ([#5388](https://github.com/lbryio/lbry-desktop/pull/5388))
+- Home/End key not working as expected in Search Bar ([#5642](https://github.com/lbryio/lbry-desktop/pull/5642))
+- Fixes to inline videos in comments _community pr!_ ([#5389](https://github.com/lbryio/lbry-desktop/pull/5389))
+- Search page crashing on some results ([#5428](https://github.com/lbryio/lbry-desktop/pull/5428))
+- Long channel names caused comments to extend underneath related content _community pr!_ ([#5431](https://github.com/lbryio/lbry-desktop/pull/5431))
+- Keep floating player always visible _community pr!_ ([#5448](https://github.com/lbryio/lbry-desktop/pull/5448))
+- LBRY Desktop incorrectly setting itself as the default HTML-file application in Linux ([#5617](https://github.com/lbryio/lbry-desktop/pull/5617))
+- All notifications being cleared when only 1 is clicked ([#5619](https://github.com/lbryio/lbry-desktop/pull/5619))
+- Markdown editor's "Create Link (Ctrl-K)" action now directly highlights the URL stub when the label is present ([#5585](https://github.com/lbryio/lbry-desktop/issues/5585))
+
+## [0.49.4] - [2021-01-26]
+
+### Added
+
+- Theater mode ([#5255](https://github.com/lbryio/lbry-desktop/pull/5255))
+- Repost flow improvements ([#5293](https://github.com/lbryio/lbry-desktop/pull/5293))
+- Desktop: Enable 'Alt+Left/Right' for history navigation _community pr!_ ([#5203](https://github.com/lbryio/lbry-desktop/pull/5203))
+- Make playback rate setting persistent _community pr!_ ([#5310](https://github.com/lbryio/lbry-desktop/pull/5310))
+- Make UI zoom setting persistent _community pr!_ ([#5385](https://github.com/lbryio/lbry-desktop/pull/5385))
+
+### Changed
+
+- No longer supporting 32 bit windows
+- Updated lbry-sdk to [0.88.0](https://github.com/lbryio/lbry-sdk/releases/tag/v0.88.0)
+- Improve how spendable balance is displayed ([#5409](https://github.com/lbryio/lbry-desktop/pull/5276))
+
+### Fixed
+
+- Lots of bug fixes
+- Fix bug where subscriptions could be lost ([#5302](https://github.com/lbryio/lbry-desktop/pull/5302))
+
+## [0.49.3] - [2020-12-30]
+
+### Added
+
+- Turn timestamps in a video's description and comments into links _community pr!_ ([#5156](https://github.com/lbryio/lbry-desktop/pull/5156))
+- Mobile video player enhancements and the ability to tap on the left and right edges to seek _community pr!_ ([#5119](https://github.com/lbryio/lbry-desktop/pull/5119))
+- Added tile layout for tags page [a0ec5](https://github.com/lbryio/lbry-desktop/commit/a0ec5097d93496b92736e1682f9fb2d20dadf425).
+
+### Changed
+
+- Repost option now has a full page and can be triggered from search results (click "View competing uploads for ...").
+
+### Fixed
+
+- [Upgrade SDK to 0.87.0](https://github.com/lbryio/lbry-sdk/releases/tag/v0.87.0). Forces wallet resync which fixes balance issues for some users and improves memory usage.
 
 ## [0.49.1] - [2020-12-15]
 

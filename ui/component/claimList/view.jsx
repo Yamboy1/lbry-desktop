@@ -9,6 +9,7 @@ import { FormField } from 'component/common/form';
 import usePersistedState from 'effects/use-persisted-state';
 import debounce from 'util/debounce';
 import ClaimPreviewTile from 'component/claimPreviewTile';
+import { prioritizeActiveLivestreams } from 'component/claimTilesDiscover/view';
 
 const DEBOUNCE_SCROLL_HANDLER_MS = 150;
 const SORT_NEW = 'new';
@@ -20,9 +21,10 @@ type Props = {
   headerAltControls: Node,
   loading: boolean,
   type: string,
+  activeUri?: string,
   empty?: string,
   defaultSort?: boolean,
-  onScrollBottom?: any => void,
+  onScrollBottom?: (any) => void,
   page?: number,
   pageSize?: number,
   id?: string,
@@ -30,17 +32,26 @@ type Props = {
   persistedStorageKey?: string,
   showHiddenByUser: boolean,
   showUnresolvedClaims?: boolean,
-  renderProperties: ?(Claim) => Node,
+  renderActions?: (Claim) => ?Node,
+  renderProperties?: (Claim) => ?Node,
   includeSupportAction?: boolean,
-  hideBlock: boolean,
   injectedItem: ?Node,
   timedOutMessage?: Node,
   tileLayout?: boolean,
-  renderActions?: Claim => ?Node,
+  searchInLanguage: boolean,
+  hideMenu?: boolean,
+  claimSearchByQuery: { [string]: Array<string> },
+  claimsByUri: { [string]: any },
+  liveLivestreamsFirst?: boolean,
+  livestreamMap?: { [string]: any },
+  searchOptions?: any,
+  collectionId?: string,
+  showNoSourceClaims?: boolean,
 };
 
 export default function ClaimList(props: Props) {
   const {
+    activeUri,
     uris,
     headerAltControls,
     loading,
@@ -54,26 +65,50 @@ export default function ClaimList(props: Props) {
     page,
     showHiddenByUser,
     showUnresolvedClaims,
-    renderProperties,
     includeSupportAction,
-    hideBlock,
     injectedItem,
     timedOutMessage,
     tileLayout = false,
     renderActions,
+    renderProperties,
+    searchInLanguage,
+    hideMenu,
+    claimSearchByQuery,
+    claimsByUri,
+    liveLivestreamsFirst,
+    livestreamMap,
+    searchOptions,
+    collectionId,
+    showNoSourceClaims,
   } = props;
 
   const [currentSort, setCurrentSort] = usePersistedState(persistedStorageKey, SORT_NEW);
   const timedOut = uris === null;
   const urisLength = (uris && uris.length) || 0;
+
+  const liveUris = [];
+  if (liveLivestreamsFirst && livestreamMap) {
+    prioritizeActiveLivestreams(uris, liveUris, livestreamMap, claimsByUri, claimSearchByQuery, searchOptions);
+  }
+
   const sortedUris = (urisLength > 0 && (currentSort === SORT_NEW ? uris : uris.slice().reverse())) || [];
+  const noResultMsg = searchInLanguage
+    ? __('No results. Contents may be hidden by the Language filter.')
+    : __('No results');
+
+  const resolveLive = (index) => {
+    if (liveLivestreamsFirst && livestreamMap && index < liveUris.length) {
+      return true;
+    }
+    return undefined;
+  };
 
   function handleSortChange() {
     setCurrentSort(currentSort === SORT_NEW ? SORT_OLD : SORT_NEW);
   }
 
   useEffect(() => {
-    const handleScroll = debounce(e => {
+    const handleScroll = debounce((e) => {
       if (page && pageSize && onScrollBottom) {
         const mainEl = document.querySelector(`.${MAIN_CLASS}`);
 
@@ -95,10 +130,19 @@ export default function ClaimList(props: Props) {
 
   return tileLayout && !header ? (
     <section className="claim-grid">
-      {urisLength > 0 && uris.map(uri => <ClaimPreviewTile key={uri} uri={uri} />)}
-      {!timedOut && urisLength === 0 && !loading && (
-        <div className="empty main--empty">{empty || __('No results')}</div>
-      )}
+      {urisLength > 0 &&
+        uris.map((uri, index) => (
+          <ClaimPreviewTile
+            key={uri}
+            uri={uri}
+            showHiddenByUser={showHiddenByUser}
+            properties={renderProperties}
+            live={resolveLive(index)}
+            collectionId={collectionId}
+            showNoSourceClaims={showNoSourceClaims}
+          />
+        ))}
+      {!timedOut && urisLength === 0 && !loading && <div className="empty main--empty">{empty || noResultMsg}</div>}
       {timedOut && timedOutMessage && <div className="empty main--empty">{timedOutMessage}</div>}
     </section>
   ) : (
@@ -113,21 +157,23 @@ export default function ClaimList(props: Props) {
             <div className={classnames('claim-list__header', { 'section__title--small': type === 'small' })}>
               {header}
               {loading && <Spinner type="small" />}
-              <div className="claim-list__alt-controls">
-                {headerAltControls}
-                {defaultSort && (
-                  <FormField
-                    className="claim-list__dropdown"
-                    type="select"
-                    name="file_sort"
-                    value={currentSort}
-                    onChange={handleSortChange}
-                  >
-                    <option value={SORT_NEW}>{__('Newest First')}</option>
-                    <option value={SORT_OLD}>{__('Oldest First')}</option>
-                  </FormField>
-                )}
-              </div>
+              {(headerAltControls || defaultSort) && (
+                <div className="claim-list__alt-controls">
+                  {headerAltControls}
+                  {defaultSort && (
+                    <FormField
+                      className="claim-list__dropdown"
+                      type="select"
+                      name="file_sort"
+                      value={currentSort}
+                      onChange={handleSortChange}
+                    >
+                      <option value={SORT_NEW}>{__('Newest First')}</option>
+                      <option value={SORT_OLD}>{__('Oldest First')}</option>
+                    </FormField>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </React.Fragment>
@@ -146,31 +192,30 @@ export default function ClaimList(props: Props) {
               <ClaimPreview
                 uri={uri}
                 type={type}
+                active={activeUri && uri === activeUri}
+                hideMenu={hideMenu}
                 includeSupportAction={includeSupportAction}
                 showUnresolvedClaim={showUnresolvedClaims}
                 properties={renderProperties || (type !== 'small' ? undefined : false)}
                 renderActions={renderActions}
                 showUserBlocked={showHiddenByUser}
-                hideBlock={hideBlock}
+                showHiddenByUser={showHiddenByUser}
+                collectionId={collectionId}
+                showNoSourceClaims={showNoSourceClaims}
                 customShouldHide={(claim: StreamClaim) => {
                   // Hack to hide spee.ch thumbnail publishes
                   // If it meets these requirements, it was probably uploaded here:
                   // https://github.com/lbryio/lbry-redux/blob/master/src/redux/actions/publish.js#L74-L79
-                  if (claim.name.length === 24 && !claim.name.includes(' ') && claim.value.author === 'Spee.ch') {
-                    return true;
-                  } else {
-                    return false;
-                  }
+                  return claim.name.length === 24 && !claim.name.includes(' ') && claim.value.author === 'Spee.ch';
                 }}
+                live={resolveLive(index)}
               />
             </React.Fragment>
           ))}
         </ul>
       )}
 
-      {!timedOut && urisLength === 0 && !loading && (
-        <div className="empty empty--centered">{empty || __('No results')}</div>
-      )}
+      {!timedOut && urisLength === 0 && !loading && <div className="empty empty--centered">{empty || noResultMsg}</div>}
       {!loading && timedOut && timedOutMessage && <div className="empty empty--centered">{timedOutMessage}</div>}
     </section>
   );

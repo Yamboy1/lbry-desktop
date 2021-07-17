@@ -6,7 +6,7 @@ import { ipcRenderer, remote } from 'electron';
 import path from 'path';
 import * as ACTIONS from 'constants/action_types';
 import * as MODALS from 'constants/modal_types';
-import { DOMAIN } from 'config';
+import { DOMAIN, SIMPLE_SITE } from 'config';
 import {
   Lbry,
   doBalanceSubscribe,
@@ -15,13 +15,17 @@ import {
   makeSelectClaimIsMine,
   doPopulateSharedUserState,
   doFetchChannelListMine,
+  doFetchCollectionListMine,
   doClearPublish,
   doPreferenceGet,
   doClearSupport,
   SHARED_PREFERENCES,
   DAEMON_SETTINGS,
   SETTINGS,
+  selectMyChannelClaims,
+  doCheckPendingClaims,
 } from 'lbry-redux';
+import { Lbryio } from 'lbryinc';
 import { selectFollowedTagsList } from 'redux/selectors/tags';
 import { doToast, doError, doNotificationList } from 'redux/actions/notifications';
 
@@ -48,15 +52,13 @@ import {
 import { selectDaemonSettings, makeSelectClientSetting } from 'redux/selectors/settings';
 import { selectUser, selectUserVerifiedEmail } from 'redux/selectors/user';
 // import { selectDaemonSettings } from 'redux/selectors/settings';
-import { doSyncSubscribe, doSetPrefsReady } from 'redux/actions/sync';
+import { doSyncLoop, doSetPrefsReady } from 'redux/actions/sync';
 import { doAuthenticate } from 'redux/actions/user';
 import { lbrySettings as config, version as appVersion } from 'package.json';
 import analytics, { SHARE_INTERNAL } from 'analytics';
 import { doSignOutCleanup } from 'util/saved-passwords';
-import { doSocketConnect } from 'redux/actions/websocket';
+import { doNotificationSocketConnect } from 'redux/actions/websocket';
 import { stringifyServerParam, shouldSetSetting } from 'util/sync-settings';
-import sha256 from 'crypto-js/sha256';
-import Base64 from 'crypto-js/enc-base64';
 
 // @if TARGET='app'
 const { autoUpdater } = remote.require('electron-updater');
@@ -115,10 +117,10 @@ export function doDownloadUpgrade() {
     const upgradeFilename = selectUpgradeFilename(state);
 
     const options = {
-      onProgress: p => dispatch(doUpdateDownloadProgress(Math.round(p * 100))),
+      onProgress: (p) => dispatch(doUpdateDownloadProgress(Math.round(p * 100))),
       directory: dir,
     };
-    download(remote.getCurrentWindow(), selectUpdateUrl(state), options).then(downloadItem => {
+    download(remote.getCurrentWindow(), selectUpdateUrl(state), options).then((downloadItem) => {
       /**
        * TODO: get the download path directly from the download object. It should just be
        * downloadItem.getSavePath(), but the copy on the main process is being garbage collected
@@ -149,7 +151,7 @@ export function doDownloadUpgradeRequested() {
   // This will probably be reorganized once we get auto-update going on Linux and remove
   // the old logic.
 
-  return dispatch => {
+  return (dispatch) => {
     if (['win32', 'darwin'].includes(process.platform) || !!process.env.APPIMAGE) {
       // electron-updater behavior
       dispatch(doOpenModal(MODALS.AUTO_UPDATE_DOWNLOADED));
@@ -174,7 +176,7 @@ export function doClearUpgradeTimer() {
 }
 
 export function doAutoUpdate() {
-  return dispatch => {
+  return (dispatch) => {
     dispatch({
       type: ACTIONS.AUTO_UPDATE_DOWNLOADED,
     });
@@ -186,7 +188,7 @@ export function doAutoUpdate() {
 }
 
 export function doAutoUpdateDeclined() {
-  return dispatch => {
+  return (dispatch) => {
     dispatch(doClearUpgradeTimer());
 
     dispatch({
@@ -267,7 +269,7 @@ export function doCheckUpgradeAvailable() {
   Initiate a timer that will check for an app upgrade every 10 minutes.
  */
 export function doCheckUpgradeSubscribe() {
-  return dispatch => {
+  return (dispatch) => {
     const checkUpgradeTimer = setInterval(() => dispatch(doCheckUpgradeAvailable()), CHECK_UPGRADE_INTERVAL);
     dispatch({
       type: ACTIONS.CHECK_UPGRADE_SUBSCRIBE,
@@ -277,7 +279,7 @@ export function doCheckUpgradeSubscribe() {
 }
 
 export function doCheckDaemonVersion() {
-  return dispatch => {
+  return (dispatch) => {
     // @if TARGET='app'
     Lbry.version().then(({ lbrynet_version: lbrynetVersion }) => {
       // Avoid the incompatible daemon modal if running in dev mode
@@ -305,31 +307,31 @@ export function doCheckDaemonVersion() {
 }
 
 export function doNotifyEncryptWallet() {
-  return dispatch => {
+  return (dispatch) => {
     dispatch(doOpenModal(MODALS.WALLET_ENCRYPT));
   };
 }
 
 export function doNotifyDecryptWallet() {
-  return dispatch => {
+  return (dispatch) => {
     dispatch(doOpenModal(MODALS.WALLET_DECRYPT));
   };
 }
 
 export function doNotifyUnlockWallet() {
-  return dispatch => {
+  return (dispatch) => {
     dispatch(doOpenModal(MODALS.WALLET_UNLOCK));
   };
 }
 
 export function doNotifyForgetPassword(props) {
-  return dispatch => {
+  return (dispatch) => {
     dispatch(doOpenModal(MODALS.WALLET_PASSWORD_UNSAVE, props));
   };
 }
 
 export function doAlertError(errorList) {
-  return dispatch => {
+  return (dispatch) => {
     dispatch(doError(errorList));
   };
 }
@@ -364,7 +366,7 @@ export function doDaemonReady() {
         undefined,
         undefined,
         shareUsageData,
-        status => {
+        (status) => {
           const trendingAlgorithm =
             status &&
             status.wallet &&
@@ -397,7 +399,7 @@ export function doDaemonReady() {
 }
 
 export function doClearCache() {
-  return dispatch => {
+  return (dispatch) => {
     // Need to update this to work with new version of redux-persist
     // Leaving for now
     // const reducersToClear = whiteListedReducers.filter(reducerKey => reducerKey !== 'tags');
@@ -418,7 +420,7 @@ export function doQuit() {
 }
 
 export function doQuitAnyDaemon() {
-  return dispatch => {
+  return (dispatch) => {
     // @if TARGET='app'
     Lbry.stop()
       .catch(() => {
@@ -440,7 +442,7 @@ export function doQuitAnyDaemon() {
 }
 
 export function doChangeVolume(volume) {
-  return dispatch => {
+  return (dispatch) => {
     dispatch({
       type: ACTIONS.VOLUME_CHANGED,
       data: {
@@ -451,7 +453,7 @@ export function doChangeVolume(volume) {
 }
 
 export function doChangeMute(muted) {
-  return dispatch => {
+  return (dispatch) => {
     dispatch({
       type: ACTIONS.VOLUME_MUTED,
       data: {
@@ -502,17 +504,18 @@ export function doAnalyticsBuffer(uri, bufferData) {
     const fileSize = source.size; // size in bytes
     const fileSizeInBits = fileSize * 8;
     const bitRate = parseInt(fileSizeInBits / fileDurationInSeconds);
-    const userIdHash = Base64.stringify(sha256(user.id));
-
-    analytics.videoBufferEvent(claim, {
-      timeAtBuffer,
-      bufferDuration,
-      bitRate,
-      userIdHash,
-      duration: fileDurationInSeconds,
-      playerPoweredBy: bufferData.playerPoweredBy,
-      readyState: bufferData.readyState,
-    });
+    const userId = user && user.id.toString();
+    if (userId) {
+      analytics.videoBufferEvent(claim, {
+        timeAtBuffer,
+        bufferDuration,
+        bitRate,
+        userId,
+        duration: fileDurationInSeconds,
+        playerPoweredBy: bufferData.playerPoweredBy,
+        readyState: bufferData.readyState,
+      });
+    }
   };
 }
 
@@ -528,7 +531,7 @@ export function doAnalyticsTagSync() {
 }
 
 export function doAnaltyicsPurchaseEvent(fileInfo) {
-  return dispatch => {
+  return (dispatch) => {
     let purchasePrice = fileInfo.purchase_receipt && fileInfo.purchase_receipt.amount;
     if (purchasePrice) {
       const purchaseInt = Number(Number(purchasePrice).toFixed(0));
@@ -541,23 +544,27 @@ export function doSignIn() {
   return (dispatch, getState) => {
     const state = getState();
     const user = selectUser(state);
-    const notificationsEnabled = user.experimental_ui;
+    const notificationsEnabled = SIMPLE_SITE || user.experimental_ui;
+
+    dispatch(doNotificationSocketConnect(notificationsEnabled));
 
     if (notificationsEnabled) {
-      dispatch(doSocketConnect());
       dispatch(doNotificationList());
     }
+    dispatch(doCheckPendingClaims());
 
     // @if TARGET='web'
     dispatch(doBalanceSubscribe());
     dispatch(doFetchChannelListMine());
+    dispatch(doFetchCollectionListMine());
     // @endif
   };
 }
 
 export function doSignOut() {
-  return dispatch => {
-    doSignOutCleanup()
+  return () => {
+    Lbryio.call('user', 'signout')
+      .then(doSignOutCleanup)
       .then(() => {
         // @if TARGET='web'
         window.persistor.purge();
@@ -619,7 +626,6 @@ export function doGetAndPopulatePreferences() {
     function successCb(savedPreferences) {
       const successState = getState();
       const daemonSettings = selectDaemonSettings(successState);
-
       if (savedPreferences !== null) {
         dispatch(doPopulateSharedUserState(savedPreferences));
         // @if TARGET='app'
@@ -646,7 +652,7 @@ export function doGetAndPopulatePreferences() {
       return true;
     }
 
-    function failCb() {
+    function failCb(er) {
       dispatch(
         doToast({
           isError: true,
@@ -656,6 +662,7 @@ export function doGetAndPopulatePreferences() {
 
       dispatch({
         type: ACTIONS.SYNC_FATAL_ERROR,
+        error: er,
       });
 
       return false;
@@ -666,7 +673,7 @@ export function doGetAndPopulatePreferences() {
 }
 
 export function doHandleSyncComplete(error, hasNewData) {
-  return dispatch => {
+  return (dispatch) => {
     if (!error) {
       dispatch(doGetAndPopulatePreferences());
 
@@ -674,12 +681,14 @@ export function doHandleSyncComplete(error, hasNewData) {
         // we just got sync data, better update our channels
         dispatch(doFetchChannelListMine());
       }
+    } else {
+      console.error('Error in doHandleSyncComplete', error);
     }
   };
 }
 
 export function doSyncWithPreferences() {
-  return dispatch => dispatch(doSyncSubscribe());
+  return (dispatch) => dispatch(doSyncLoop());
 }
 
 export function doToggleInterestedInYoutubeSync() {
@@ -691,5 +700,56 @@ export function doToggleInterestedInYoutubeSync() {
 export function doToggleSplashAnimation() {
   return {
     type: ACTIONS.TOGGLE_SPLASH_ANIMATION,
+  };
+}
+
+export function doSetActiveChannel(claimId) {
+  return (dispatch, getState) => {
+    if (claimId) {
+      return dispatch({
+        type: ACTIONS.SET_ACTIVE_CHANNEL,
+        data: {
+          claimId,
+        },
+      });
+    }
+
+    // If no claimId is passed, set the active channel to the one with the highest effective_amount
+    const state = getState();
+    const myChannelClaims = selectMyChannelClaims(state);
+
+    if (!myChannelClaims || !myChannelClaims.length) {
+      return;
+    }
+
+    const myChannelClaimsByEffectiveAmount = myChannelClaims.slice().sort((a, b) => {
+      const effectiveAmountA = (a.meta && Number(a.meta.effective_amount)) || 0;
+      const effectiveAmountB = (b.meta && Number(b.meta.effective_amount)) || 0;
+      if (effectiveAmountA === effectiveAmountB) {
+        return 0;
+      } else if (effectiveAmountA > effectiveAmountB) {
+        return -1;
+      } else {
+        return 1;
+      }
+    });
+
+    const newActiveChannelClaim = myChannelClaimsByEffectiveAmount[0];
+
+    dispatch({
+      type: ACTIONS.SET_ACTIVE_CHANNEL,
+      data: {
+        claimId: newActiveChannelClaim.claim_id,
+      },
+    });
+  };
+}
+
+export function doSetIncognito(incognitoEnabled) {
+  return {
+    type: ACTIONS.SET_INCOGNITO,
+    data: {
+      enabled: incognitoEnabled,
+    },
   };
 }

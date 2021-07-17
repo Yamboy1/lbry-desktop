@@ -36,7 +36,10 @@
 
 .main-wrapper__inner--filepage {
   padding: 0;
-  padding-top: var(--spacing-s);
+}
+
+.main-wrapper__inner--theater-mode {
+  padding-top: 0;
 }
 
 .main {
@@ -61,29 +64,63 @@
   max-width: var(--page-max-width--filepage);
   margin-left: auto;
   margin-right: auto;
+  margin-top: var(--spacing-m);
+  padding: 0 var(--spacing-m);
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
-  padding-left: var(--spacing-m);
-  padding-right: var(--spacing-m);
+  position: relative;
 
   > :first-child {
-    flex: 1;
-    margin-right: var(--spacing-m);
+    flex-grow: 2;
+  }
+
+  .file-page__secondary-content {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    width: 100%;
+    margin-top: var(--spacing-m);
+    max-width: var(--page-max-width--filepage);
+    margin-left: auto;
+    margin-right: auto;
+
+    > :first-child {
+      flex: 1;
+      max-width: 100%;
+    }
+
+    @media (min-width: $breakpoint-medium) {
+      flex-direction: row;
+    }
+  }
+
+  .file-page__post-comments {
+    margin-top: var(--spacing-l);
+
+    @media (min-width: $breakpoint-small) {
+      padding: var(--spacing-m);
+    }
+  }
+
+  .file-page__info {
+    margin-top: var(--spacing-m);
   }
 
   .file-page__recommended {
-    width: 25rem;
     height: 0%;
+    width: 35rem;
+    margin-left: var(--spacing-m);
 
     @media (max-width: $breakpoint-medium) {
       width: 100%;
+      margin-left: 0;
       margin-top: var(--spacing-l);
     }
   }
 
   @media (max-width: $breakpoint-medium) {
     flex-direction: column;
-
     > :first-child {
       margin-right: 0;
     }
@@ -91,7 +128,59 @@
 
   @media (max-width: $breakpoint-small) {
     padding: var(--spacing-xs);
+    flex-direction: column;
     padding-top: 0;
+  }
+}
+
+.main--theater-mode {
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0;
+  width: 100vw;
+  max-width: none;
+
+  > :first-child {
+    margin-right: 0;
+  }
+
+  .file-page__info {
+    padding: 0 var(--spacing-m);
+    margin-top: var(--spacing-m);
+    max-width: var(--page-max-width--filepage);
+    display: flex;
+    flex-direction: column;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .file-page__recommended {
+    width: 25rem;
+  }
+
+  .file-page__secondary-content {
+    padding: 0 var(--spacing-s);
+
+    @media (min-width: $breakpoint-medium) {
+      flex-direction: row;
+    }
+  }
+}
+
+.main--livestream {
+  width: calc(100vw - var(--spacing-xs) * 2);
+  margin: var(--spacing-xs);
+
+  @media (min-width: $breakpoint-medium) {
+    margin: var(--spacing-m);
+    margin-right: calc(var(--livestream-comments-width) + var(--spacing-m));
+    width: calc(100vw - var(--livestream-comments-width) - var(--spacing-m) * 2);
+  }
+
+  @media (min-width: $breakpoint-large) {
+    margin-right: calc(10vw + var(--livestream-comments-width) + var(--spacing-m));
   }
 }
 
@@ -101,7 +190,7 @@
   @media (min-width: $breakpoint-large) {
     max-width: none;
     width: 100%;
-    padding: 0 var(--spacing-l);
+    margin: 0 var(--spacing-l);
   }
 }
 
@@ -116,6 +205,10 @@
     margin-top: var(--spacing-main-padding);
     padding: 0 var(--spacing-l);
   }
+}
+
+.main--markdown {
+  flex-direction: column;
 }
 
 .main__auth-content {
@@ -175,6 +268,21 @@
   }
 }
 
+.main--send {
+  @extend .main--buy;
+  max-width: 34rem;
+}
+
+.main--swap {
+  @extend .main--buy;
+  max-width: 34rem;
+}
+
+.main--report-content {
+  @extend .main--auth-page;
+  max-width: 40rem;
+}
+
 .main--empty {
   align-self: center;
   display: flex;
@@ -227,6 +335,38 @@
   max-width: 27rem;
   margin-left: auto;
   margin-right: auto;
+}
+
+.main__sign-up--graphic {
+  max-width: 47rem;
+
+  .card__second-pane {
+    width: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-login-graphic-background);
+
+    @media (max-width: $breakpoint-small) {
+      width: 100%;
+    }
+
+    .signup-image {
+      @media (max-width: $breakpoint-small) {
+        width: 50%;
+      }
+    }
+  }
+
+  .card__title {
+    font-size: var(--font-heading);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .card__main-actions {
+    border: none;
+  }
 }
 
 .main__channel-creation {

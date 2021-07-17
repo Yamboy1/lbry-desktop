@@ -1,5 +1,5 @@
 // @flow
-import { SITE_NAME } from 'config';
+import { SITE_NAME, SITE_HELP_EMAIL } from 'config';
 import * as ICONS from 'constants/icons';
 import * as React from 'react';
 import classnames from 'classnames';
@@ -10,6 +10,7 @@ import { YOUTUBE_STATUSES } from 'lbryinc';
 import { buildURI } from 'lbry-redux';
 import Spinner from 'component/spinner';
 import Icon from 'component/common/icon';
+import I18nMessage from 'component/i18nMessage';
 
 type Props = {
   youtubeChannels: Array<any>,
@@ -34,17 +35,20 @@ export default function YoutubeTransferStatus(props: Props) {
     addNewChannel,
   } = props;
   const hasChannels = youtubeChannels && youtubeChannels.length > 0;
-  const transferEnabled = youtubeChannels.some(status => status.transferable);
+  const transferEnabled = youtubeChannels.some((status) => status.transferable);
   const hasPendingTransfers = youtubeChannels.some(
-    status => status.transfer_state === YOUTUBE_STATUSES.YOUTUBE_SYNC_PENDING_TRANSFER
+    (status) => status.transfer_state === YOUTUBE_STATUSES.YOUTUBE_SYNC_PENDING_TRANSFER
   );
   const isYoutubeTransferComplete =
     hasChannels &&
     youtubeChannels.every(
-      channel =>
+      (channel) =>
         channel.transfer_state === YOUTUBE_STATUSES.YOUTUBE_SYNC_COMPLETED_TRANSFER ||
         channel.sync_status === YOUTUBE_STATUSES.YOUTUBE_SYNC_ABANDONDED
     );
+
+  const isNotElligible =
+    hasChannels && youtubeChannels.every((channel) => channel.sync_status === YOUTUBE_STATUSES.YOUTUBE_SYNC_ABANDONDED);
 
   let total;
   let complete;
@@ -91,7 +95,9 @@ export default function YoutubeTransferStatus(props: Props) {
     (alwaysShow || (hasChannels && !isYoutubeTransferComplete)) && (
       <Card
         title={
-          isYoutubeTransferComplete
+          isNotElligible
+            ? __('Process complete')
+            : isYoutubeTransferComplete
             ? __('Transfer complete')
             : youtubeChannels.length > 1
             ? __('Your YouTube channels')
@@ -105,9 +111,22 @@ export default function YoutubeTransferStatus(props: Props) {
             {!transferEnabled &&
               !hasPendingTransfers &&
               !isYoutubeTransferComplete &&
+              !isNotElligible &&
               __('Please check back later. This may take up to 1 week.')}
 
-            {isYoutubeTransferComplete && __('View your channel or choose a new channel to sync.')}
+            {isYoutubeTransferComplete && !isNotElligible && __('View your channel or choose a new channel to sync.')}
+            {isNotElligible && (
+              <I18nMessage
+                tokens={{
+                  here: (
+                    <Button button="link" href="https://lbry.com/faq/youtube" label={__('here')} />
+                    ),
+                  email: SITE_HELP_EMAIL,
+                }}
+              >
+                Email %email% if you think there has been a mistake. Make sure your channel qualifies %here%.
+              </I18nMessage>
+            )}
           </span>
         }
         body={
@@ -124,6 +143,8 @@ export default function YoutubeTransferStatus(props: Props) {
               const transferState = getMessage(channel);
               const isWaitingForSync =
                 syncStatus === YOUTUBE_STATUSES.YOUTUBE_SYNC_QUEUED ||
+                syncStatus === YOUTUBE_STATUSES.YOUTUBE_SYNC_PENDING ||
+                syncStatus === YOUTUBE_STATUSES.YOUTUBE_SYNC_PENDING_EMAIL ||
                 syncStatus === YOUTUBE_STATUSES.YOUTUBE_SYNC_PENDINGUPGRADE ||
                 syncStatus === YOUTUBE_STATUSES.YOUTUBE_SYNC_SYNCING;
 
@@ -203,6 +224,8 @@ export default function YoutubeTransferStatus(props: Props) {
               {youtubeChannels.length > 1
                 ? __('You will be able to claim your channels once they finish syncing.')
                 : __('You will be able to claim your channel once it has finished syncing.')}{' '}
+              {youtubeImportPending &&
+                __('You will not be able to edit the channel or content until the transfer process completes.')}{' '}
               <Button button="link" label={__('Learn More')} href="https://lbry.com/faq/youtube#transfer" />{' '}
               {addNewChannel && <Button button="link" label={__('Add Another Channel')} onClick={addNewChannel} />}
             </p>

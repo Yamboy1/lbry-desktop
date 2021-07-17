@@ -26,10 +26,14 @@
   height: calc(100vh - var(--header-height));
   border-right: 1px solid var(--color-border);
   padding-top: var(--spacing-l);
-  padding-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-l);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 
   @media (min-width: $breakpoint-small) {
     overflow-y: hidden;
+    justify-content: space-between;
 
     &:hover {
       overflow-y: auto;
@@ -72,9 +76,8 @@
   }
 }
 
-.navigation__secondary--tags {
-  @extend .navigation__secondary;
-  margin-left: var(--spacing-l);
+.navigation__tertiary {
+  margin-top: var(--spacing-m);
 }
 
 .navigation-link {
@@ -101,6 +104,27 @@
     flex-direction: column;
   }
 
+  &.navigation-link--with-thumbnail .button__content {
+    flex-direction: row;
+
+    .channel-thumbnail {
+      @include handleChannelGif(1.5rem);
+      flex-shrink: 0;
+      margin-right: var(--spacing-s);
+    }
+
+    .channel-staked__wrapper {
+      margin-bottom: 0.2rem;
+      left: -0.55rem;
+
+      .channel-staked__indicator {
+        height: 0.75rem;
+        width: 0.75rem;
+        margin-left: 0;
+      }
+    }
+  }
+
   &:hover:not(.navigation-link--active),
   &:focus {
     @extend .navigation-link--highlighted;
@@ -111,8 +135,8 @@
     margin-bottom: 0;
 
     .icon {
-      height: 1rem;
-      width: 1rem;
+      height: 1.5rem;
+      width: 1.5rem;
     }
 
     .button__content {
@@ -198,8 +222,8 @@
     margin-bottom: 0;
 
     .icon {
-      height: 1rem;
-      width: 1rem;
+      height: 1.5rem;
+      width: 1.5rem;
     }
 
     .button__content {
@@ -222,7 +246,16 @@
   @extend .navigation-links;
   margin-right: 0;
   padding-right: 0;
-  font-size: var(--font-small);
+  margin-top: var(--spacing-xl);
+  margin-bottom: 0;
+
+  .navigation-link {
+    font-size: var(--font-small);
+  }
+
+  .button__label {
+    color: var(--color-text-help);
+  }
 
   .button__content {
     align-items: flex-start;

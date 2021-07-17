@@ -1,4 +1,4 @@
-import videojs from 'video.js/dist/alt/video.core.novtt.min.js';
+import videojs from 'video.js';
 import './touchOverlay.js';
 import window from 'global/window';
 import './plugin.scss';
@@ -13,7 +13,7 @@ const defaults = {
     iOS: false,
   },
   touchControls: {
-    seekSeconds: 10,
+    seekSeconds: 5,
     tapTimeout: 300,
     disableOnEnd: false,
   },

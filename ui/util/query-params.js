@@ -1,5 +1,6 @@
 // @flow
 import { SEARCH_OPTIONS } from 'constants/search';
+import { SIMPLE_SITE } from 'config';
 
 const DEFAULT_SEARCH_RESULT_FROM = 0;
 const DEFAULT_SEARCH_SIZE = 20;
@@ -10,10 +11,10 @@ export function parseQueryParams(queryString: string) {
     .split('?')
     .pop()
     .split('&')
-    .map(p => p.split('='));
+    .map((p) => p.split('='));
 
   const params = {};
-  parts.forEach(array => {
+  parts.forEach((array) => {
     const [first, second] = array;
     params[first] = second;
   });
@@ -32,9 +33,11 @@ export function updateQueryParam(uri: string, key: string, value: string) {
 }
 
 export const getSearchQueryString = (query: string, options: any = {}) => {
+  const FORCE_FREE_ONLY = SIMPLE_SITE;
+  const isSurroundedByQuotes = (str) => str[0] === '"' && str[str.length - 1] === '"';
   const encodedQuery = encodeURIComponent(query);
   const queryParams = [
-    `s=${encodedQuery}`,
+    options.exact && !isSurroundedByQuotes(encodedQuery) ? `s="${encodedQuery}"` : `s=${encodedQuery}`,
     `size=${options.size || DEFAULT_SEARCH_SIZE}`,
     `from=${options.from || DEFAULT_SEARCH_RESULT_FROM}`,
   ];
@@ -46,7 +49,10 @@ export const getSearchQueryString = (query: string, options: any = {}) => {
     if (claimType) {
       queryParams.push(`claimType=${claimType}`);
 
-      // If they are only searching for channels, strip out the media info
+      /*
+       * Due to limitations in lighthouse, we can't pass the mediaType parameter
+       * when searching for channels or "everything".
+       */
       if (!claimType.includes(SEARCH_OPTIONS.INCLUDE_CHANNELS)) {
         queryParams.push(
           `mediaType=${[
@@ -60,19 +66,38 @@ export const getSearchQueryString = (query: string, options: any = {}) => {
         );
       }
     }
+
+    const sortBy = options[SEARCH_OPTIONS.SORT];
+    if (sortBy) {
+      queryParams.push(`${SEARCH_OPTIONS.SORT}=${sortBy}`);
+    }
+
+    const timeFilter = options[SEARCH_OPTIONS.TIME_FILTER];
+    if (timeFilter) {
+      queryParams.push(`${SEARCH_OPTIONS.TIME_FILTER}=${timeFilter}`);
+    }
   }
 
   const additionalOptions = {};
   const { related_to } = options;
   const { nsfw } = options;
+
   if (related_to) additionalOptions['related_to'] = related_to;
-  if (typeof nsfw !== 'undefined') additionalOptions['nsfw'] = nsfw;
+  if (nsfw === false) additionalOptions['nsfw'] = false;
 
   if (additionalOptions) {
-    Object.keys(additionalOptions).forEach(key => {
+    Object.keys(additionalOptions).forEach((key) => {
       const option = additionalOptions[key];
       queryParams.push(`${key}=${option}`);
     });
+  }
+
+  if (FORCE_FREE_ONLY) {
+    const index = queryParams.findIndex((q) => q.startsWith('free_only'));
+    if (index > -1) {
+      queryParams.splice(index, 1);
+    }
+    queryParams.push(`free_only=true`);
   }
 
   return queryParams.join('&');

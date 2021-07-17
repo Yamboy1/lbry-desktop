@@ -1,20 +1,22 @@
 import { connect } from 'react-redux';
-import { makeSelectClaimForUri, makeSelectClaimIsNsfw } from 'lbry-redux';
-import { doSearch } from 'redux/actions/search';
+import { makeSelectClaimIsNsfw, makeSelectClaimForUri } from 'lbry-redux';
+import { doFetchRecommendedContent } from 'redux/actions/search';
 import { makeSelectRecommendedContentForUri, selectIsSearching } from 'redux/selectors/search';
 import { selectUserVerifiedEmail } from 'redux/selectors/user';
-import RecommendedVideos from './view';
+import { makeSelectNextUnplayedRecommended } from 'redux/selectors/content';
+import RecommendedContent from './view';
 
 const select = (state, props) => ({
-  claim: makeSelectClaimForUri(props.uri)(state),
   mature: makeSelectClaimIsNsfw(props.uri)(state),
   recommendedContent: makeSelectRecommendedContentForUri(props.uri)(state),
+  nextRecommendedUri: makeSelectNextUnplayedRecommended(props.uri)(state),
   isSearching: selectIsSearching(state),
   isAuthenticated: selectUserVerifiedEmail(state),
+  claim: makeSelectClaimForUri(props.uri)(state),
 });
 
-const perform = dispatch => ({
-  search: (query, options) => dispatch(doSearch(query, options)),
+const perform = (dispatch) => ({
+  doFetchRecommendedContent: (uri, mature) => dispatch(doFetchRecommendedContent(uri, mature)),
 });
 
-export default connect(select, perform)(RecommendedVideos);
+export default connect(select, perform)(RecommendedContent);

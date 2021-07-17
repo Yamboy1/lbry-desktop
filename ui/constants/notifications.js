@@ -1,6 +1,15 @@
-export const NOTIFICATION_CREATOR_SUBSCRIBER = 'creator_subscriber';
-export const NOTIFICATION_COMMENT = 'comment';
-export const NOTIFICATION_REPLY = 'comment-reply';
-export const DAILY_WATCH_AVAILABLE = 'daily_watch_available';
-export const DAILY_WATCH_REMIND = 'daily_watch_remind';
-export const NEW_CONTENT = 'new_content';
+export const RULE = {
+  COMMENT: 'comment',
+  COMMENT_REPLY: 'comment-reply',
+  CREATOR_COMMENT: 'creator_comment',
+  FIAT_TIP: 'fiat_tip',
+  NEW_CONTENT: 'new_content',
+  NEW_LIVESTREAM: 'new_livestream',
+  DAILY_WATCH_AVAILABLE: 'daily_watch_available',
+  DAILY_WATCH_REMIND: 'daily_watch_remind',
+  MISSED_OUT: 'missed_out',
+  REWARDS_APPROVAL_PROMPT: 'rewards_approval_prompt',
+  CREATOR_SUBSCRIBER: 'creator_subscriber',
+};
+
+export const NOTIFICATION_NAME_ALL = 'All';

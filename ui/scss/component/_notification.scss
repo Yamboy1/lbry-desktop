@@ -1,5 +1,5 @@
 $thumbnailWidth: 4rem;
-$contentMaxWidth: 35rem;
+$contentMaxWidth: 60rem;
 
 .notifications__empty {
   background-color: var(--color-card-background);
@@ -175,6 +175,10 @@ $contentMaxWidth: 35rem;
   justify-content: center;
 }
 
+.notification__bubble--small {
+  font-size: var(--font-xsmall);
+}
+
 .notification__bubble--inline {
   @extend .notification__bubble;
   top: 0.75rem;
@@ -221,5 +225,13 @@ $contentMaxWidth: 35rem;
     &:focus {
       @include linkFocus;
     }
+  }
+}
+
+.notification__filter {
+  display: none;
+
+  @media (min-width: $breakpoint-small) {
+    display: block;
   }
 }

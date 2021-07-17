@@ -4,9 +4,9 @@
 import '@babel/polyfill';
 import SemVer from 'semver';
 import https from 'https';
-import { app, dialog, ipcMain, session, shell, ipcRenderer } from 'electron';
+import { app, dialog, ipcMain, session, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import { Lbry, LbryFirst } from 'lbry-redux';
+import { Lbry } from 'lbry-redux';
 import LbryFirstInstance from './LbryFirstInstance';
 import Daemon from './Daemon';
 import isDev from 'electron-is-dev';
@@ -46,7 +46,10 @@ let lbryFirst;
 
 const appState = {};
 
-app.setAsDefaultProtocolClient('lbry');
+if (process.platform !== 'linux') {
+  app.setAsDefaultProtocolClient('lbry');
+}
+
 app.name = 'LBRY';
 app.setAppUserModelId('io.lbry.LBRY');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
@@ -177,7 +180,6 @@ if (!gotSingleInstanceLock) {
     if (isDev) {
       await installDevtools();
     }
-
     rendererWindow = createWindow(appState);
     tray = createTray(rendererWindow);
 

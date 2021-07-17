@@ -61,6 +61,7 @@ $metadata-z-index: 1;
 
 .channel-thumbnail {
   display: flex;
+  position: relative;
   height: 5rem;
   width: 5rem;
   background-size: cover;
@@ -74,6 +75,12 @@ $metadata-z-index: 1;
 .channel-thumbnail--small {
   height: 3rem;
   width: 3rem;
+}
+
+.channel-thumbnail--xsmall {
+  height: 2.1rem;
+  width: 2.1rem;
+  margin-right: var(--spacing-xs);
 }
 
 .chanel-thumbnail--waiting {
@@ -102,6 +109,7 @@ $metadata-z-index: 1;
 .channel-thumbnail__custom {
   width: 100%;
   object-fit: cover;
+  font-size: 1px; // To hide the alt text on firefox;
 }
 
 .channel-thumbnail__default {
@@ -166,7 +174,7 @@ $metadata-z-index: 1;
   // Quick hack to get this to work
   // We should have a generic style for "header with button next to it"
   .button {
-    margin-left: var(--spacing-m);
+    margin-left: var(--spacing-xs);
   }
 
   @media (max-width: $breakpoint-small) {
@@ -182,10 +190,6 @@ $metadata-z-index: 1;
   .button {
     height: auto;
   }
-}
-
-.channel__image--blurred {
-  filter: blur(16px);
 }
 
 .channel__quick-actions {
@@ -264,15 +268,21 @@ $metadata-z-index: 1;
 }
 
 .menu__list.channel__list {
-  margin-top: var(--spacing-s);
+  margin-top: var(--spacing-xs);
   margin-left: 0;
+  padding: 0;
   border-radius: var(--border-radius);
   background: transparent;
+  max-height: 15rem;
+  overflow-y: scroll;
 
   [role='menuitem'] {
+    margin: 0;
+
     &[data-selected] {
       background: transparent;
-      .channel__list-item {
+      .channel__list-item,
+      .channel-staked__wrapper {
         background-color: var(--color-card-background-highlighted);
       }
     }
@@ -306,6 +316,7 @@ $metadata-z-index: 1;
   background-color: var(--color-card-background);
   padding: var(--spacing-s);
   border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
 
   .channel-thumbnail {
     height: 2rem;
@@ -314,8 +325,14 @@ $metadata-z-index: 1;
 
   .icon {
     color: var(--color-menu-icon);
-    margin-left: var(--spacing-l);
-    margin-right: var(--spacing-s);
+  }
+
+  .icon__wrapper {
+    padding: 0;
+    height: 2rem;
+    width: 2rem;
+    margin-right: var(--spacing-m);
+    border-radius: var(--border-radius);
   }
 
   &:hover {
@@ -326,5 +343,83 @@ $metadata-z-index: 1;
 .channel__list-item--selected {
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
-  background-color: var(--color-card-background-highlighted);
+
+  .icon--ChevronDown {
+    margin-left: var(--spacing-l);
+  }
+}
+
+.channel__list-text {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.channel__selector {
+  margin-bottom: var(--spacing-m);
+
+  @media (min-width: $breakpoint-small) {
+    margin-bottom: var(--spacing-l);
+  }
+}
+
+.channel-staked__tooltip {
+  display: flex;
+  align-items: center;
+  line-height: 1rem;
+}
+
+.channel-staked__tooltip-text {
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-xsmall);
+}
+
+.channel-staked__wrapper {
+  display: flex;
+  position: absolute;
+  padding: 0.2rem;
+  bottom: -0.75rem;
+  left: -0.8rem;
+  background-color: var(--color-card-background);
+  border-radius: 50%;
+}
+
+.channel-staked__wrapper--large {
+  position: relative;
+  background-color: transparent;
+  display: inline-block;
+  bottom: auto;
+  left: auto;
+  top: var(--spacing-xs);
+  margin-left: var(--spacing-s);
+  padding: 0;
+}
+
+.channel-staked__wrapper--inline {
+  position: relative;
+  background-color: transparent;
+  display: inline-block;
+  bottom: auto;
+  left: auto;
+  top: var(--spacing-xs);
+  padding: 0;
+}
+
+.channel-staked__indicator {
+  margin-left: 1px;
+  z-index: 3;
+  fill: var(--color-gray-3);
+}
+
+.channel-staked__indicator--controlling {
+  fill: #00eaff;
+}
+
+.channel-staked__amount {
+  display: inline-block;
+  font-size: var(--font-xxsmall);
+  margin-left: var(--spacing-s);
+
+  .credit-amount {
+    color: var(--color-gray-3);
+  }
 }

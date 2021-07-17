@@ -4,7 +4,7 @@
 .media__thumb {
   @include thumbnail;
   position: relative;
-  border-radius: var(--card-radius);
+  border-radius: var(--border-radius);
   object-fit: cover;
   background-color: var(--color-placeholder-background);
   background-position: center;
@@ -30,32 +30,6 @@
     max-width: 100%;
     white-space: nowrap;
   }
-
-  // This is terrible and should not be removed
-  .icon {
-    margin-right: var(--spacing-xs) / 2;
-    margin-bottom: -0.08rem;
-  }
-}
-
-.media__uri--inline {
-  @extend .media__uri;
-  position: relative;
-  transform: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.media__uri--right {
-  @extend .media__uri;
-  right: 0;
-}
-
-.media__uri--right--yt-badge {
-  @extend .media__uri--right;
-  @media (max-width: $breakpoint-small) {
-    display: none;
-  }
 }
 
 //  M E D I A
@@ -65,14 +39,11 @@
   align-self: flex-start;
   color: var(--color-text-subtitle);
   font-size: var(--font-small);
-
-  svg {
-    stroke: var(--color-text-subtitle);
-  }
 }
 
 .media__subtitle--centered {
   @extend .media__subtitle;
+  align-self: auto;
   align-items: center;
   display: flex;
 }
@@ -80,12 +51,13 @@
 .media__subtitle--between {
   @extend .media__subtitle;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-direction: row;
+  flex-wrap: wrap;
 
-  @media (min-width: $breakpoint-small) {
-    justify-content: space-between;
-    align-items: flex-end;
-    flex-direction: row;
+  @media (max-width: $breakpoint-medium) {
+    display: block;
   }
 }
 
@@ -119,6 +91,7 @@
 
 .media__info-text--fade {
   -webkit-mask-image: -webkit-gradient(linear, left 30%, left bottom, from(rgba(0, 0, 0, 1)), to(rgba(0, 0, 0, 0)));
+  overflow-wrap: anywhere;
 }
 
 .media__info-expand {
@@ -134,10 +107,10 @@
 }
 
 .media__actions {
+  @include font-sans;
   position: relative;
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
   margin-top: 0;
 
   > *:not(:last-child) {
@@ -145,7 +118,6 @@
   }
 
   @media (max-width: $breakpoint-small) {
-    justify-content: flex-start;
     padding-top: var(--spacing-s);
 
     > * {
@@ -160,4 +132,9 @@
   font-size: var(--font-xxsmall);
   display: flex;
   flex-direction: column;
+  margin-bottom: var(--spacing-s);
+
+  &:not(:last-child) {
+    margin-bottom: var(--spacing-s);
+  }
 }

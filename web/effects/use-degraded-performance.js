@@ -11,10 +11,10 @@ export const STATUS_DEGRADED = 'degraded';
 export const STATUS_FAILING = 'failing';
 export const STATUS_DOWN = 'down';
 
-const getParams = user => {
+const getParams = (user) => {
   const headers = {};
   const token = getAuthToken();
-  if (token && user.has_verified_email) {
+  if (token && user && user.has_verified_email) {
     headers[X_LBRY_AUTH_TOKEN] = token;
   }
   const params = { headers };
@@ -22,7 +22,7 @@ const getParams = user => {
 };
 
 export function useDegradedPerformance(onDegradedPerformanceCallback, user) {
-  const hasUser = user !== undefined;
+  const hasUser = user !== undefined && user !== null;
 
   useEffect(() => {
     if (hasUser) {
@@ -31,8 +31,8 @@ export function useDegradedPerformance(onDegradedPerformanceCallback, user) {
       const STATUS_ENDPOINT = `${SDK_API_PATH}/status`.replace('v1', 'v2');
 
       fetchWithTimeout(STATUS_TIMEOUT_LIMIT, fetch(STATUS_ENDPOINT, getParams(user)))
-        .then(response => response.json())
-        .then(status => {
+        .then((response) => response.json())
+        .then((status) => {
           if (status.general_state !== STATUS_OK) {
             onDegradedPerformanceCallback(STATUS_FAILING);
           }

@@ -5,25 +5,39 @@ import { selectGetSyncErrorMessage, selectSyncFatalError } from 'redux/selectors
 import { doFetchAccessToken, doUserSetReferrer } from 'redux/actions/user';
 import { selectUser, selectAccessToken, selectUserVerifiedEmail } from 'redux/selectors/user';
 import { selectUnclaimedRewards } from 'redux/selectors/rewards';
-import { doFetchChannelListMine, SETTINGS } from 'lbry-redux';
+import {
+  doFetchChannelListMine,
+  doFetchCollectionListMine,
+  SETTINGS,
+  selectMyChannelUrls,
+  doResolveUris,
+} from 'lbry-redux';
+import { selectSubscriptions } from 'redux/selectors/subscriptions';
 import {
   makeSelectClientSetting,
   selectLanguage,
   selectLoadedLanguages,
   selectThemePath,
 } from 'redux/selectors/settings';
-import { selectIsUpgradeAvailable, selectAutoUpdateDownloaded, selectModal } from 'redux/selectors/app';
+import {
+  selectIsUpgradeAvailable,
+  selectAutoUpdateDownloaded,
+  selectModal,
+  selectActiveChannelClaim,
+} from 'redux/selectors/app';
 import { doGetWalletSyncPreference, doSetLanguage } from 'redux/actions/settings';
-import { doSyncSubscribe } from 'redux/actions/sync';
+import { doSyncLoop } from 'redux/actions/sync';
 import {
   doDownloadUpgradeRequested,
   doSignIn,
   doGetAndPopulatePreferences,
-  doAnalyticsTagSync,
+  doSetActiveChannel,
+  doSetIncognito,
 } from 'redux/actions/app';
+import { doFetchModBlockedList, doFetchCommentModAmIList } from 'redux/actions/comments';
 import App from './view';
 
-const select = state => ({
+const select = (state) => ({
   user: selectUser(state),
   accessToken: selectAccessToken(state),
   theme: selectThemePath(state),
@@ -38,19 +52,27 @@ const select = state => ({
   isAuthenticated: selectUserVerifiedEmail(state),
   currentModal: selectModal(state),
   syncFatalError: selectSyncFatalError(state),
+  activeChannelClaim: selectActiveChannelClaim(state),
+  myChannelUrls: selectMyChannelUrls(state),
+  subscriptions: selectSubscriptions(state),
 });
 
-const perform = dispatch => ({
-  analyticsTagSync: () => dispatch(doAnalyticsTagSync()),
+const perform = (dispatch) => ({
   fetchAccessToken: () => dispatch(doFetchAccessToken()),
   fetchChannelListMine: () => dispatch(doFetchChannelListMine()),
-  setLanguage: language => dispatch(doSetLanguage(language)),
+  fetchCollectionListMine: () => dispatch(doFetchCollectionListMine()),
+  setLanguage: (language) => dispatch(doSetLanguage(language)),
   signIn: () => dispatch(doSignIn()),
   requestDownloadUpgrade: () => dispatch(doDownloadUpgradeRequested()),
   updatePreferences: () => dispatch(doGetAndPopulatePreferences()),
   getWalletSyncPref: () => dispatch(doGetWalletSyncPreference()),
-  syncSubscribe: () => dispatch(doSyncSubscribe()),
+  syncLoop: (noInterval) => dispatch(doSyncLoop(noInterval)),
   setReferrer: (referrer, doClaim) => dispatch(doUserSetReferrer(referrer, doClaim)),
+  setActiveChannelIfNotSet: () => dispatch(doSetActiveChannel()),
+  setIncognito: () => dispatch(doSetIncognito()),
+  fetchModBlockedList: () => dispatch(doFetchModBlockedList()),
+  resolveUris: (uris) => dispatch(doResolveUris(uris)),
+  fetchModAmIList: () => dispatch(doFetchCommentModAmIList()),
 });
 
 export default hot(connect(select, perform)(App));

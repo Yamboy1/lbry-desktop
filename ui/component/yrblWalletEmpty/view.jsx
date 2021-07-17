@@ -1,6 +1,5 @@
 // @flow
 import type { Node } from 'react';
-import * as MODALS from 'constants/modal_types';
 import * as ICONS from 'constants/icons';
 import * as PAGES from 'constants/pages';
 import React from 'react';
@@ -13,10 +12,9 @@ type Props = {
   includeWalletLink: boolean,
   type?: string,
   actions?: Node,
-  doOpenModal: string => void,
 };
 export default function YrblHelp(props: Props) {
-  const { includeWalletLink = false, type = 'sad', doOpenModal } = props;
+  const { includeWalletLink = false, type = 'sad' } = props;
 
   return (
     <div className="main--empty">
@@ -41,13 +39,13 @@ export default function YrblHelp(props: Props) {
         actions={
           <div className="section__actions">
             <Button button="primary" icon={ICONS.REWARDS} label={__('Earn Rewards')} navigate={`/$/${PAGES.REWARDS}`} />
-            <Button button="secondary" icon={ICONS.BUY} label={'Buy Credits'} navigate={`/$/${PAGES.BUY}`} />
+            <Button button="secondary" icon={ICONS.BUY} label={'Buy/Swap Credits'} navigate={`/$/${PAGES.BUY}`} />
             {includeWalletLink && (
               <Button
                 icon={ICONS.RECEIVE}
                 button="secondary"
                 label={__('Your Address')}
-                onClick={() => doOpenModal(MODALS.WALLET_RECEIVE)}
+                navigate={`/$/${PAGES.RECEIVE}`}
               />
             )}
           </div>

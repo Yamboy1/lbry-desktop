@@ -1,5 +1,4 @@
 // @flow
-import { SITE_NAME } from 'config';
 import * as PAGES from 'constants/pages';
 import React, { useState } from 'react';
 import { withRouter } from 'react-router';
@@ -9,9 +8,11 @@ import Button from 'component/button';
 import { Lbryio } from 'lbryinc';
 import I18nMessage from 'component/i18nMessage';
 import Card from 'component/common/card';
-
+// @if TARGET='web'
+import Pixel from 'web/component/pixel';
+// @endif
 type Props = {
-  history: { push: string => void, location: { search: string } },
+  history: { push: (string) => void, location: { search: string } },
   doToast: ({}) => void,
 };
 
@@ -92,7 +93,7 @@ function SignInVerifyPage(props: Props) {
     <Page authPage>
       <div className="main__sign-up">
         <Card
-          title={isAuthenticationSuccess ? __('Log in success!') : __('Log in to %SITE_NAME%', { SITE_NAME })}
+          title={isAuthenticationSuccess ? __('Log in success!') : __('Log in')}
           subtitle={
             <React.Fragment>
               <p>
@@ -133,6 +134,9 @@ function SignInVerifyPage(props: Props) {
           }
         />
       </div>
+      {/* @if TARGET='web' */}
+      <Pixel type={'kill'} />
+      {/* @endif */}
     </Page>
   );
 }

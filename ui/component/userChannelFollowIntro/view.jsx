@@ -6,7 +6,7 @@ import Nag from 'component/common/nag';
 import { parseURI } from 'lbry-redux';
 import Button from 'component/button';
 import Card from 'component/common/card';
-import { AUTO_FOLLOW_CHANNELS, SIMPLE_SITE } from 'config';
+import { AUTO_FOLLOW_CHANNELS, CUSTOM_HOMEPAGE } from 'config';
 
 type Props = {
   subscribedChannels: Array<Subscription>,
@@ -14,28 +14,36 @@ type Props = {
   onBack: () => void,
   channelSubscribe: (sub: Subscription) => void,
   homepageData: any,
+  prefsReady: boolean,
 };
 
 const channelsToSubscribe = AUTO_FOLLOW_CHANNELS.trim()
   .split(' ')
-  .filter(x => x !== '');
+  .filter((x) => x !== '');
 
 function UserChannelFollowIntro(props: Props) {
-  const { subscribedChannels, channelSubscribe, onContinue, onBack, homepageData } = props;
-  const { PRIMARY_CONTENT_CHANNEL_IDS } = homepageData;
+  const { subscribedChannels, channelSubscribe, onContinue, onBack, homepageData, prefsReady } = props;
+  const { PRIMARY_CONTENT } = homepageData;
+  let channelIds;
+  if (PRIMARY_CONTENT && CUSTOM_HOMEPAGE) {
+    channelIds = PRIMARY_CONTENT.channelIds;
+  }
   const followingCount = (subscribedChannels && subscribedChannels.length) || 0;
 
   // subscribe to lbry
   useEffect(() => {
-    if (channelsToSubscribe && channelsToSubscribe.length) {
-      channelsToSubscribe.forEach(c =>
-        channelSubscribe({
-          channelName: parseURI(c).claimName,
-          uri: c,
-        })
-      );
+    if (channelsToSubscribe && channelsToSubscribe.length && prefsReady) {
+      const delayedChannelSubscribe = () => {
+        channelsToSubscribe.forEach((c) =>
+          channelSubscribe({
+            channelName: parseURI(c).claimName,
+            uri: c,
+          })
+        );
+      };
+      setTimeout(delayedChannelSubscribe, 1000);
     }
-  }, []);
+  }, [prefsReady]);
 
   return (
     <Card
@@ -58,7 +66,7 @@ function UserChannelFollowIntro(props: Props) {
               defaultOrderBy={CS.ORDER_BY_TOP}
               defaultFreshness={CS.FRESH_ALL}
               claimType="channel"
-              claimIds={SIMPLE_SITE ? undefined : PRIMARY_CONTENT_CHANNEL_IDS}
+              claimIds={CUSTOM_HOMEPAGE && channelIds ? channelIds : undefined}
               defaultTags={followingCount > 3 ? CS.TAGS_FOLLOWED : undefined}
             />
             {followingCount > 0 && (

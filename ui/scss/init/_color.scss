@@ -13,6 +13,7 @@
   --color-cost: #ffd580;
   --color-focus: #93cff2;
   --color-notification: #f02849;
+  --color-live: #cc190f;
 
   --color-black: #111;
   --color-white: #fdfdfd;
@@ -36,7 +37,7 @@
   --color-button-primary-bg-hover: var(--color-primary-alt-2);
   --color-button-primary-hover-text: var(--color-primary-alt);
   --color-button-secondary-bg: var(--color-secondary-alt);
-  --color-button-secondary-border: #c5d7ed;
+  --color-button-secondary-border: var(--color-secondary-alt);
   --color-button-secondary-text: var(--color-secondary);
   --color-button-secondary-bg-hover: #b9d0e9;
   --color-button-alt-bg: var(--color-gray-1);
@@ -44,18 +45,6 @@
   --color-button-alt-bg-hover: var(--color-gray-2);
   --color-link: var(--color-primary);
   --color-link-hover: var(--color-black);
-
-  // Input
-  --color-input-color: #111111;
-  --color-input-label: var(--color-gray-5);
-  --color-input-placeholder: #212529;
-  --color-input-bg: #f4f4f4;
-  --color-input-bg-copyable: #434b53;
-  --color-input-border: var(--color-border);
-  --color-input-border-active: var(--color-secondary);
-  --color-input-toggle: var(--color-secondary);
-  --color-input-toggle-bg: var(--color-gray-1);
-  --color-input-toggle-bg-hover: var(--color-secondary-alt);
 
   // Table
   --color-table-highlight: var(--color-white-alt);

@@ -83,22 +83,43 @@ dl {
 }
 
 dt {
-  flex-basis: 45%;
+  flex-basis: 50%;
   text-align: left;
   font-weight: bold;
 }
 
+.dt__text {
+  margin-right: var(--spacing-s);
+}
+
 dd {
-  flex-basis: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-basis: 45%;
   flex-grow: 1;
   margin: 0;
   text-align: right;
+
+  .help--warning {
+    margin-bottom: 0;
+    margin-top: var(--spacing-s);
+    text-align: left;
+  }
+}
+
+.dd__text {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dd__button {
+  margin-right: var(--spacing-s);
 }
 
 dt,
 dd {
   padding: var(--spacing-m) var(--spacing-s);
-
   border-top: 1px solid var(--color-border);
 
   &:last-of-type {
@@ -107,9 +128,12 @@ dd {
 }
 
 blockquote {
-  padding: 0.8rem;
-  background-color: var(--color-blockquote-bg);
-  border-left: 0.3rem solid var(--color-blockquote);
+  padding: 0 0.8rem;
+  margin-top: var(--spacing-xxs);
+  margin-bottom: var(--spacing-xxs);
+  opacity: 0.9;
+  border-left: 0.2rem solid var(--color-blockquote);
+  color: var(--color-text-subtitle);
 }
 
 code {
@@ -186,6 +210,28 @@ textarea {
     padding-left: $spacing-width * 2/3;
     flex: 1;
   }
+
+  .column__item--between {
+    justify-content: space-between;
+  }
+
+  @media (max-width: $breakpoint-small) {
+    flex-direction: column;
+    .column__item:not(:first-child) {
+      padding-left: 0;
+      flex: 1;
+    }
+    & > * {
+      margin: 0;
+      margin-bottom: var(--spacing-m);
+      width: 100%;
+      flex-basis: auto;
+
+      &:first-child {
+        margin-right: 0;
+      }
+    }
+  }
 }
 
 .truncated-text {
@@ -216,7 +262,7 @@ textarea {
 
 .help {
   display: block;
-  font-size: var(--font-small);
+  font-size: var(--font-xsmall);
   color: var(--color-text-help);
   margin-top: var(--spacing-s);
 
@@ -227,12 +273,26 @@ textarea {
   .button--link ~ .button--link {
     margin-left: var(--spacing-s);
   }
+
+  @media (min-width: $breakpoint-small) {
+    font-size: var(--font-small);
+  }
 }
 
 .help--warning {
   @extend .help;
-  color: var(--color-text-help-warning);
+  padding: var(--spacing-s);
+  color: var(--color-black);
+  border-radius: var(--border-radius);
+  background-color: var(--color-help-warning-bg);
+  color: var(--color-help-warning-text);
   margin-bottom: var(--spacing-s);
+  border: 1px solid var(--color-border);
+}
+
+.help--notice {
+  @extend .help--warning;
+  background-color: var(--color-card-background-highlighted);
 }
 
 .help--inline {
@@ -253,6 +313,16 @@ textarea {
 .help--card-actions {
   @extend .help;
   margin-top: var(--spacing-m);
+}
+
+.help--dt {
+  @extend .help;
+  display: inline-block;
+  margin-top: 0;
+}
+
+.help--spendable {
+  margin-left: var(--spacing-xxs);
 }
 
 .empty {
@@ -312,6 +382,18 @@ textarea {
   background-size: cover;
 }
 
+.thumbnail-picker__preview {
+  width: calc(var(--thumbnail-preview-width) * 1.5);
+  height: calc(var(--thumbnail-preview-height) * 1.5);
+  background-color: var(--color-thumbnail-background);
+  padding: var(--spacing-s);
+  font-size: var(--font-small);
+  border-radius: var(--border-radius);
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
 .emoji {
   font-size: 1.3em;
 }
@@ -321,14 +403,25 @@ textarea {
 }
 
 .notice-message {
+  position: relative;
   border-radius: var(--border-radius);
   padding: var(--spacing-l);
   background-color: var(--color-primary-alt);
+
+  ~ .card {
+    margin-top: var(--spacing-m);
+  }
 }
 
-.notice-message--above-content {
+.notice-message--loud {
   @extend .notice-message;
-  margin-bottom: var(--spacing-l);
+  background-color: #fef1f6;
+  color: var(--color-black);
+  font-weight: bold;
+
+  .button {
+    color: #fa6165;
+  }
 }
 
 .privacy-img {
@@ -348,6 +441,14 @@ textarea {
   &:last-child {
     margin-bottom: 0;
   }
+}
+
+.confirm__value--no-gap {
+  margin-bottom: 0;
+}
+
+.confirm__value--subitem {
+  font-size: var(--font-xsmall);
 }
 
 .mobile-only {
@@ -380,4 +481,21 @@ textarea {
 .adspruce-bannerspot {
   height: 5rem;
   width: 100%;
+}
+
+.release__notes {
+  max-height: 50vh;
+  overflow: scroll;
+}
+
+.signup__odysee-logo {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    margin-top: var(--spacing-xl);
+    height: 4rem;
+  }
 }

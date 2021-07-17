@@ -45,7 +45,7 @@ export const OVERLAY_DATA = {
  */
 function showOneOffOverlay(player, className, overlayJsx, align) {
   // Delete existing:
-  OVERLAY_DATA.overlays = OVERLAY_DATA.overlays.filter(x => x.name !== OVERLAY_NAME_ONE_OFF);
+  OVERLAY_DATA.overlays = OVERLAY_DATA.overlays.filter((x) => x.name !== OVERLAY_NAME_ONE_OFF);
   // Create new one:
   OVERLAY_DATA.overlays.push({
     name: OVERLAY_NAME_ONE_OFF,
@@ -91,6 +91,25 @@ export function showSeekedOverlay(player, duration, isForward) {
       <p>
         {isForward ? '+' : '-'}
         {duration}
+      </p>
+    </div>
+  );
+
+  showOneOffOverlay(player, OVERLAY_CLASS_SEEKED, overlayJsx, 'center');
+}
+
+/**
+ * Displays a transient "Volume Percentage" overlay.
+ *
+ * @param player The videojs instance.
+ * @param percentage how much % of volume active.
+ */
+export function showVolumeverlay(player, percentage) {
+  const overlayJsx = (
+    <div>
+      <p>
+        {percentage}
+        {'%'}
       </p>
     </div>
   );

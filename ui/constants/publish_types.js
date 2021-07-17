@@ -1,2 +1,3 @@
-export const FILE = 'File';
-export const POST = 'Post';
+export const FILE = 'file';
+export const POST = 'post';
+export const LIVESTREAM = 'livestream';

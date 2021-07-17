@@ -11,6 +11,7 @@ import REWARD_TYPES from 'rewards';
 import RewardAuthIntro from 'component/rewardAuthIntro';
 import Card from 'component/common/card';
 import I18nMessage from 'component/i18nMessage';
+import { SITE_HELP_EMAIL, SITE_NAME } from 'config';
 
 type Props = {
   doAuth: () => void,
@@ -69,17 +70,19 @@ class RewardsPage extends PureComponent<Props> {
 
               <p>
                 {__(
-                  'We apologize for this inconvenience, but have added this additional step to prevent abuse. Users on VPN or shared connections will continue to see this message and are not not eligible for Rewards.'
+                  'We apologize for this inconvenience, but have added this additional step to prevent abuse. Users on VPN or shared connections will continue to see this message and are not eligible for Rewards.'
                 )}
               </p>
               <p>
                 <I18nMessage
                   tokens={{
                     rewards_faq: <Button button="link" label={__('Rewards FAQ')} href="https://lbry.com/faq/support" />,
+                    help_email: SITE_HELP_EMAIL,
+                    site_name: SITE_NAME,
                   }}
                 >
-                  Please review the %rewards_faq% for eligibility, and send us an email to help@lbry.com if you continue
-                  to see this message. You can continue to use LBRY without this feature.
+                  Please review the %rewards_faq% for eligibility, and send us an email to %help_email% if you continue
+                  to see this message. You can continue to use %site_name% without this feature.
                 </I18nMessage>
                 {`${__('Enjoy all the awesome free content in the meantime!')}`}
               </p>
@@ -156,7 +159,7 @@ class RewardsPage extends PureComponent<Props> {
           'card--disabled': isNotEligible,
         })}
       >
-        {rewards.map(reward => (
+        {rewards.map((reward) => (
           <RewardTile key={reward.claim_code} reward={reward} />
         ))}
         {this.renderCustomRewardCode()}

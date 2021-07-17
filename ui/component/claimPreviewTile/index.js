@@ -8,8 +8,9 @@ import {
   doFileGet,
   makeSelectChannelForClaimUri,
   makeSelectClaimIsNsfw,
+  makeSelectClaimIsStreamPlaceholder,
 } from 'lbry-redux';
-import { selectBlockedChannels } from 'redux/selectors/blocked';
+import { selectMutedChannels } from 'redux/selectors/blocked';
 import { selectBlackListedOutpoints, selectFilteredOutpoints } from 'lbryinc';
 import { selectShowMatureContent } from 'redux/selectors/settings';
 import ClaimPreviewTile from './view';
@@ -22,14 +23,15 @@ const select = (state, props) => ({
   title: props.uri && makeSelectTitleForUri(props.uri)(state),
   blackListedOutpoints: selectBlackListedOutpoints(state),
   filteredOutpoints: selectFilteredOutpoints(state),
-  blockedChannelUris: selectBlockedChannels(state),
+  blockedChannelUris: selectMutedChannels(state),
   showMature: selectShowMatureContent(state),
   isMature: makeSelectClaimIsNsfw(props.uri)(state),
+  isLivestream: makeSelectClaimIsStreamPlaceholder(props.uri)(state),
 });
 
-const perform = dispatch => ({
-  resolveUri: uri => dispatch(doResolveUri(uri)),
-  getFile: uri => dispatch(doFileGet(uri, false)),
+const perform = (dispatch) => ({
+  resolveUri: (uri) => dispatch(doResolveUri(uri)),
+  getFile: (uri) => dispatch(doFileGet(uri, false)),
 });
 
 export default connect(select, perform)(ClaimPreviewTile);

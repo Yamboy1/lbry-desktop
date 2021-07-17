@@ -1,10 +1,11 @@
 // @flow
+import { ENABLE_NO_SOURCE_CLAIMS } from 'config';
 import type { Node } from 'react';
 import * as CS from 'constants/claim_search';
 import React from 'react';
 import usePersistedState from 'effects/use-persisted-state';
 import { withRouter } from 'react-router';
-import { createNormalizedClaimSearchKey, MATURE_TAGS } from 'lbry-redux';
+import { createNormalizedClaimSearchKey, MATURE_TAGS, splitBySeparator } from 'lbry-redux';
 import Button from 'component/button';
 import moment from 'moment';
 import ClaimList from 'component/claimList';
@@ -13,24 +14,28 @@ import ClaimPreviewTile from 'component/claimPreviewTile';
 import I18nMessage from 'component/i18nMessage';
 import ClaimListHeader from 'component/claimListHeader';
 import { useIsLargeScreen } from 'effects/use-screensize';
+import { getLivestreamOnlyOptions } from 'util/search';
 
 type Props = {
   uris: Array<string>,
+  showHeader: boolean,
+  type: string,
   subscribedChannels: Array<Subscription>,
   doClaimSearch: ({}) => void,
   loading: boolean,
   personalView: boolean,
-  doToggleTagFollowDesktop: string => void,
+  doToggleTagFollowDesktop: (string) => void,
   meta?: Node,
   showNsfw: boolean,
   hideReposts: boolean,
-  history: { action: string, push: string => void, replace: string => void },
+  history: { action: string, push: (string) => void, replace: (string) => void },
   location: { search: string, pathname: string },
   claimSearchByQuery: {
     [string]: Array<string>,
   },
   claimSearchByQueryLastPageReached: { [string]: boolean },
-  hiddenUris: Array<string>,
+  mutedUris: Array<string>,
+  blockedUris: Array<string>,
   hiddenNsfwMessage?: Node,
   channelIds?: Array<string>,
   claimIds?: Array<string>,
@@ -43,13 +48,12 @@ type Props = {
   header?: Node,
   headerLabel?: string | Node,
   name?: string,
-  hideBlock?: boolean,
   hideAdvancedFilter?: boolean,
-  claimType?: Array<string>,
+  claimType?: string | Array<string>,
   defaultClaimType?: Array<string>,
   streamType?: string | Array<string>,
   defaultStreamType?: string | Array<string>,
-  renderProperties?: Claim => Node,
+  renderProperties?: (Claim) => Node,
   includeSupportAction?: boolean,
   repostedClaimId?: string,
   pageSize?: number,
@@ -64,12 +68,21 @@ type Props = {
   languageSetting: string,
   searchInLanguage: boolean,
   scrollAnchor?: string,
+  showHiddenByUser?: boolean,
+  liveLivestreamsFirst?: boolean,
+  livestreamMap?: { [string]: any },
+  hasSource?: boolean,
+  showNoSourceClaims?: boolean,
+  isChannel?: boolean,
+  empty?: string,
 };
 
 function ClaimListDiscover(props: Props) {
   const {
     doClaimSearch,
     claimSearchByQuery,
+    showHeader = true,
+    type,
     claimSearchByQueryLastPageReached,
     tags,
     defaultTags,
@@ -80,7 +93,8 @@ function ClaimListDiscover(props: Props) {
     hideReposts,
     history,
     location,
-    hiddenUris,
+    mutedUris,
+    blockedUris,
     hiddenNsfwMessage,
     defaultOrderBy,
     orderBy,
@@ -89,7 +103,6 @@ function ClaimListDiscover(props: Props) {
     name,
     claimType,
     pageSize,
-    hideBlock,
     defaultClaimType,
     streamType,
     defaultStreamType,
@@ -112,6 +125,13 @@ function ClaimListDiscover(props: Props) {
     languageSetting,
     searchInLanguage,
     scrollAnchor,
+    showHiddenByUser = false,
+    liveLivestreamsFirst,
+    livestreamMap,
+    hasSource,
+    isChannel = false,
+    showNoSourceClaims,
+    empty,
   } = props;
   const didNavigateForward = history.action === 'PUSH';
   const { search } = location;
@@ -120,13 +140,16 @@ function ClaimListDiscover(props: Props) {
   const isLargeScreen = useIsLargeScreen();
   const [orderParamEntry, setOrderParamEntry] = usePersistedState(`entry-${location.pathname}`, CS.ORDER_BY_TRENDING);
   const [orderParamUser, setOrderParamUser] = usePersistedState(`orderUser-${location.pathname}`, CS.ORDER_BY_TRENDING);
-  const followed = (followedTags && followedTags.map(t => t.name)) || [];
+  const followed = (followedTags && followedTags.map((t) => t.name)) || [];
   const urlParams = new URLSearchParams(search);
   const tagsParam = // can be 'x,y,z' or 'x' or ['x','y'] or CS.CONSTANT
     (tags && getParamFromTags(tags)) ||
     (urlParams.get(CS.TAGS_KEY) !== null && urlParams.get(CS.TAGS_KEY)) ||
     (defaultTags && getParamFromTags(defaultTags));
   const freshnessParam = freshness || urlParams.get(CS.FRESH_KEY) || defaultFreshness;
+  const mutedAndBlockedChannelIds = Array.from(
+    new Set(mutedUris.concat(blockedUris).map((uri) => splitBySeparator(uri)[1]))
+  );
 
   const langParam = urlParams.get(CS.LANGUAGE_KEY) || null;
   const languageParams = searchInLanguage
@@ -187,15 +210,17 @@ function ClaimListDiscover(props: Props) {
     not_tags: Array<string>,
     channel_ids?: Array<string>,
     claim_ids?: Array<string>,
-    not_channel_ids: Array<string>,
+    not_channel_ids?: Array<string>,
     order_by: Array<string>,
     release_time?: string,
-    claim_type?: Array<string>,
+    claim_type?: string | Array<string>,
     name?: string,
     duration?: string,
     reposted_claim_id?: string,
     stream_types?: any,
     fee_amount?: string,
+    has_source?: boolean,
+    has_no_source?: boolean,
   } = {
     page_size: dynamicPageSize,
     page,
@@ -204,9 +229,7 @@ function ClaimListDiscover(props: Props) {
     // no_totals makes it so the sdk doesn't have to calculate total number pages for pagination
     // it's faster, but we will need to remove it if we start using total_pages
     no_totals: true,
-    not_channel_ids:
-      // If channelIdsParam were passed in, we don't need not_channel_ids
-      !channelIdsParam && hiddenUris && hiddenUris.length ? hiddenUris.map(hiddenUri => hiddenUri.split('#')[1]) : [],
+    not_channel_ids: isChannel ? undefined : mutedAndBlockedChannelIds,
     not_tags: !showNsfw ? MATURE_TAGS : [],
     order_by:
       orderParam === CS.ORDER_BY_TRENDING
@@ -215,6 +238,10 @@ function ClaimListDiscover(props: Props) {
         ? CS.ORDER_BY_NEW_VALUE
         : CS.ORDER_BY_TOP_VALUE, // Sort by top
   };
+
+  if (hasSource || (!ENABLE_NO_SOURCE_CLAIMS && (!claimType || claimType === CS.CLAIM_STREAM))) {
+    options.has_source = true;
+  }
 
   if (feeAmountParam && claimType !== CS.CLAIM_CHANNEL) {
     options.fee_amount = feeAmountParam;
@@ -247,12 +274,7 @@ function ClaimListDiscover(props: Props) {
 
   if (claimType !== CS.CLAIM_CHANNEL) {
     if (orderParam === CS.ORDER_BY_TOP && freshnessParam !== CS.FRESH_ALL) {
-      options.release_time = `>${Math.floor(
-        moment()
-          .subtract(1, freshnessParam)
-          .startOf('hour')
-          .unix()
-      )}`;
+      options.release_time = `>${Math.floor(moment().subtract(1, freshnessParam).startOf('hour').unix())}`;
     } else if (orderParam === CS.ORDER_BY_NEW || orderParam === CS.ORDER_BY_TRENDING) {
       // Warning - hack below
       // If users are following more than 10 channels or tags, limit results to stuff less than a year old
@@ -263,29 +285,15 @@ function ClaimListDiscover(props: Props) {
         (options.channel_ids && options.channel_ids.length > 20) ||
         (options.any_tags && options.any_tags.length > 20)
       ) {
-        options.release_time = `>${Math.floor(
-          moment()
-            .subtract(3, CS.FRESH_MONTH)
-            .startOf('week')
-            .unix()
-        )}`;
+        options.release_time = `>${Math.floor(moment().subtract(3, CS.FRESH_MONTH).startOf('week').unix())}`;
       } else if (
         (options.channel_ids && options.channel_ids.length > 10) ||
         (options.any_tags && options.any_tags.length > 10)
       ) {
-        options.release_time = `>${Math.floor(
-          moment()
-            .subtract(1, CS.FRESH_YEAR)
-            .startOf('week')
-            .unix()
-        )}`;
+        options.release_time = `>${Math.floor(moment().subtract(1, CS.FRESH_YEAR).startOf('week').unix())}`;
       } else {
         // Hack for at least the New page until https://github.com/lbryio/lbry-sdk/issues/2591 is fixed
-        options.release_time = `<${Math.floor(
-          moment()
-            .startOf('minute')
-            .unix()
-        )}`;
+        options.release_time = `<${Math.floor(moment().startOf('minute').unix())}`;
       }
     }
   }
@@ -333,14 +341,14 @@ function ClaimListDiscover(props: Props) {
   if (hideReposts && !options.reposted_claim_id && !forceShowReposts) {
     if (Array.isArray(options.claim_type)) {
       if (options.claim_type.length > 1) {
-        options.claim_type = options.claim_type.filter(claimType => claimType !== 'repost');
+        options.claim_type = options.claim_type.filter((claimType) => claimType !== 'repost');
       }
     } else {
       options.claim_type = ['stream', 'channel'];
     }
   }
 
-  const hasMatureTags = tagsParam && tagsParam.split(',').some(t => MATURE_TAGS.includes(t));
+  const hasMatureTags = tagsParam && tagsParam.split(',').some((t) => MATURE_TAGS.includes(t));
   const claimSearchCacheQuery = createNormalizedClaimSearchKey(options);
   const claimSearchResult = claimSearchByQuery[claimSearchCacheQuery];
   const claimSearchResultLastPageReached = claimSearchByQueryLastPageReached[claimSearchCacheQuery];
@@ -451,6 +459,10 @@ function ClaimListDiscover(props: Props) {
     if (shouldPerformSearch) {
       const searchOptions = JSON.parse(optionsStringForEffect);
       doClaimSearch(searchOptions);
+
+      if (liveLivestreamsFirst && options.page === 1) {
+        doClaimSearch(getLivestreamOnlyOptions(searchOptions));
+      }
     }
   }, [doClaimSearch, shouldPerformSearch, optionsStringForEffect, forceRefresh]);
 
@@ -499,8 +511,13 @@ function ClaimListDiscover(props: Props) {
             timedOutMessage={timedOutMessage}
             renderProperties={renderProperties}
             includeSupportAction={includeSupportAction}
-            hideBlock={hideBlock}
             injectedItem={injectedItem}
+            showHiddenByUser={showHiddenByUser}
+            liveLivestreamsFirst={liveLivestreamsFirst}
+            livestreamMap={livestreamMap}
+            searchOptions={options}
+            showNoSourceClaims={showNoSourceClaims}
+            empty={empty}
           />
           {loading && (
             <div className="claim-grid">
@@ -512,13 +529,15 @@ function ClaimListDiscover(props: Props) {
         </div>
       ) : (
         <div>
-          <div className="section__header--actions">
-            {headerToUse}
-            {meta && <div className="section__actions--no-margin">{meta}</div>}
-          </div>
-
+          {showHeader && (
+            <div className="section__header--actions">
+              {headerToUse}
+              {meta && <div className="section__actions--no-margin">{meta}</div>}
+            </div>
+          )}
           <ClaimList
             id={claimSearchCacheQuery}
+            type={type}
             loading={loading}
             uris={uris || claimSearchResult}
             onScrollBottom={handleScrollBottom}
@@ -527,10 +546,18 @@ function ClaimListDiscover(props: Props) {
             timedOutMessage={timedOutMessage}
             renderProperties={renderProperties}
             includeSupportAction={includeSupportAction}
-            hideBlock={hideBlock}
             injectedItem={injectedItem}
+            showHiddenByUser={showHiddenByUser}
+            liveLivestreamsFirst={liveLivestreamsFirst}
+            livestreamMap={livestreamMap}
+            searchOptions={options}
+            showNoSourceClaims={showNoSourceClaims}
+            empty={empty}
           />
-          {loading && new Array(dynamicPageSize).fill(1).map((x, i) => <ClaimPreview key={i} placeholder="loading" />)}
+          {loading &&
+            new Array(dynamicPageSize)
+              .fill(1)
+              .map((x, i) => <ClaimPreview key={i} placeholder="loading" type={type} />)}
         </div>
       )}
     </React.Fragment>

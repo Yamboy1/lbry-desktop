@@ -48,7 +48,7 @@ function ChannelAbout(props: Props) {
             <Fragment>
               <label>{__('Contact')}</label>
               <div className="media__info-text">
-                <MarkdownPreview content={formatEmail(email)} />
+                <MarkdownPreview content={formatEmail(email)} simpleLinks />
               </div>
             </Fragment>
           )}
@@ -56,7 +56,7 @@ function ChannelAbout(props: Props) {
             <Fragment>
               <label>{__('Site')}</label>
               <div className="media__info-text">
-                <MarkdownPreview content={website} />
+                <MarkdownPreview content={website} simpleLinks />
               </div>
             </Fragment>
           )}

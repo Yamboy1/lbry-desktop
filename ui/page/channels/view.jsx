@@ -11,6 +11,7 @@ import Yrbl from 'component/yrbl';
 import LbcSymbol from 'component/common/lbc-symbol';
 import * as PAGES from 'constants/pages';
 import HelpLink from 'component/common/help-link';
+import { useHistory } from 'react-router';
 
 type Props = {
   channels: Array<ChannelClaim>,
@@ -18,20 +19,22 @@ type Props = {
   fetchChannelListMine: () => void,
   fetchingChannels: boolean,
   youtubeChannels: ?Array<any>,
+  doSetActiveChannel: (string) => void,
 };
 
 export default function ChannelsPage(props: Props) {
-  const { channels, channelUrls, fetchChannelListMine, fetchingChannels, youtubeChannels } = props;
+  const { channels, channelUrls, fetchChannelListMine, fetchingChannels, youtubeChannels, doSetActiveChannel } = props;
   const [rewardData, setRewardData] = React.useState();
   const hasYoutubeChannels = youtubeChannels && Boolean(youtubeChannels.length);
-  const hasPendingChannels = channels && channels.some(channel => channel.confirmations < 0);
+  const hasPendingChannels = channels && channels.some((channel) => channel.confirmations < 0);
+  const { push } = useHistory();
 
   useEffect(() => {
     fetchChannelListMine();
   }, [fetchChannelListMine, hasPendingChannels]);
 
   useEffect(() => {
-    Lbryio.call('user_rewards', 'view_rate').then(data => setRewardData(data));
+    Lbryio.call('user_rewards', 'view_rate').then((data) => setRewardData(data));
   }, [setRewardData]);
 
   return (
@@ -52,7 +55,7 @@ export default function ChannelsPage(props: Props) {
             }
             loading={fetchingChannels}
             uris={channelUrls}
-            renderActions={claim => {
+            renderActions={(claim) => {
               const claimsInChannel = claim.meta.claims_in_channel;
               return claimsInChannel === 0 ? (
                 <span />
@@ -62,12 +65,15 @@ export default function ChannelsPage(props: Props) {
                     button="alt"
                     icon={ICONS.ANALYTICS}
                     label={__('Analytics')}
-                    navigate={`/$/${PAGES.CREATOR_DASHBOARD}?channel=${encodeURIComponent(claim.canonical_url)}`}
+                    onClick={() => {
+                      doSetActiveChannel(claim.claim_id);
+                      push(`/$/${PAGES.CREATOR_DASHBOARD}`);
+                    }}
                   />
                 </div>
               );
             }}
-            renderProperties={claim => {
+            renderProperties={(claim) => {
               const claimsInChannel = claim.meta.claims_in_channel;
               if (!claim || claimsInChannel === 0) {
                 return null;
@@ -76,7 +82,7 @@ export default function ChannelsPage(props: Props) {
               const channelRewardData =
                 rewardData &&
                 rewardData.rates &&
-                rewardData.rates.find(data => {
+                rewardData.rates.find((data) => {
                   return data.channel_claim_id === claim.claim_id;
                 });
 
@@ -86,7 +92,10 @@ export default function ChannelsPage(props: Props) {
                     <span className="help--inline">
                       {__('Earnings per view')} <HelpLink href="https://lbry.com/faq/view-rewards" />
                     </span>
-                    <LbcSymbol postfix={channelRewardData.view_rate.toFixed(2)} />
+
+                    <span>
+                      <LbcSymbol postfix={channelRewardData.view_rate.toFixed(2)} />
+                    </span>
                   </span>
                 );
               } else {
@@ -106,7 +115,7 @@ export default function ChannelsPage(props: Props) {
                 subtitle={__("You haven't created a channel yet. All of your beautiful channels will be listed here!")}
                 actions={
                   <div className="section__actions">
-                    <Button button="primary" label={__('New Channel')} navigate={`/$/${PAGES.CHANNEL_NEW}`} />
+                    <Button button="primary" label={__('Create Channel')} navigate={`/$/${PAGES.CHANNEL_NEW}`} />
                   </div>
                 }
               />

@@ -5,10 +5,11 @@ import * as PAGES from 'constants/pages';
 import React from 'react';
 import CreditAmount from 'component/common/credit-amount';
 import Button from 'component/button';
-import Icon from 'component/common/icon';
 import HelpLink from 'component/common/help-link';
 import Card from 'component/common/card';
 import LbcSymbol from 'component/common/lbc-symbol';
+import I18nMessage from 'component/i18nMessage';
+import { formatNumberWithCommas } from 'util/number';
 
 type Props = {
   balance: number,
@@ -16,107 +17,170 @@ type Props = {
   claimsBalance: number,
   supportsBalance: number,
   tipsBalance: number,
-  doOpenModal: string => void,
+  doOpenModal: (string) => void,
   hasSynced: boolean,
+  doFetchUtxoCounts: () => void,
+  doUtxoConsolidate: () => void,
+  fetchingUtxoCounts: boolean,
+  consolidatingUtxos: boolean,
+  consolidateIsPending: boolean,
+  massClaimingTips: boolean,
+  massClaimIsPending: boolean,
+  utxoCounts: { [string]: number },
 };
 
+export const WALLET_CONSOLIDATE_UTXOS = 400;
+const LARGE_WALLET_BALANCE = 100;
+
 const WalletBalance = (props: Props) => {
-  const { balance, claimsBalance, supportsBalance, tipsBalance, doOpenModal, hasSynced } = props;
+  const {
+    balance,
+    claimsBalance,
+    supportsBalance,
+    tipsBalance,
+    doOpenModal,
+    hasSynced,
+    doUtxoConsolidate,
+    doFetchUtxoCounts,
+    consolidatingUtxos,
+    consolidateIsPending,
+    massClaimingTips,
+    massClaimIsPending,
+    utxoCounts,
+  } = props;
+  const [detailsExpanded, setDetailsExpanded] = React.useState(false);
+
+  const { other: otherCount = 0 } = utxoCounts || {};
+
+  const totalBalance = balance + tipsBalance + supportsBalance + claimsBalance;
+  const totalLocked = tipsBalance + claimsBalance + supportsBalance;
+  const operationPending = massClaimIsPending || massClaimingTips || consolidateIsPending || consolidatingUtxos;
+
+  React.useEffect(() => {
+    if (balance > LARGE_WALLET_BALANCE && detailsExpanded) {
+      doFetchUtxoCounts();
+    }
+  }, [doFetchUtxoCounts, balance, detailsExpanded]);
 
   return (
-    <React.Fragment>
-      <section className="columns">
-        <Card
-          title={<LbcSymbol postfix={balance} isTitle />}
-          subtitle={__('Available Balance')}
-          actions={
-            <div className="section__actions">
-              <Button button="primary" label={__('Buy')} icon={ICONS.BUY} navigate={`/$/${PAGES.BUY}`} />
-              <Button
-                button="secondary"
-                label={__('Receive')}
-                icon={ICONS.RECEIVE}
-                onClick={() => doOpenModal(MODALS.WALLET_RECEIVE)}
-              />
-              <Button
-                button="secondary"
-                label={__('Send')}
-                icon={ICONS.SEND}
-                onClick={() => doOpenModal(MODALS.WALLET_SEND)}
-              />
-            </div>
-          }
-        />
-        <div>
-          <React.Fragment>
-            {/* @if TARGET='app' */}
-            {hasSynced ? (
-              <div className="section">
-                <div className="section__flex">
-                  <Icon sectionIcon icon={ICONS.LOCK} />
-                  <h2 className="section__title--small">
-                    {__('A backup of your wallet is synced with lbry.tv.')}
-                    <HelpLink href="https://lbry.com/faq/account-sync" />
-                  </h2>
-                </div>
-              </div>
-            ) : (
-              <div className="section">
-                <div className="section__flex">
-                  <Icon sectionIcon icon={ICONS.UNLOCK} />
-                  <h2 className="section__title--small">
-                    {__(
-                      'Your wallet is not currently synced with lbry.tv. You are in control of backing up your wallet.'
+    <Card
+      title={<LbcSymbol postfix={formatNumberWithCommas(totalBalance)} isTitle />}
+      subtitle={
+        totalLocked > 0 ? (
+          <I18nMessage tokens={{ lbc: <LbcSymbol /> }}>
+            Your total balance. All of this is yours, but some %lbc% is in use on channels and content right now.
+          </I18nMessage>
+        ) : (
+          <span>{__('Your total balance.')}</span>
+        )
+      }
+      actions={
+        <>
+          <h2 className="section__title--small">
+            <I18nMessage tokens={{ lbc_amount: <CreditAmount amount={balance} precision={4} /> }}>
+              %lbc_amount% immediately spendable
+            </I18nMessage>
+          </h2>
+
+          <h2 className="section__title--small">
+            <I18nMessage
+              tokens={{
+                lbc_amount: <CreditAmount amount={totalLocked} precision={4} />,
+              }}
+            >
+              %lbc_amount% boosting content
+            </I18nMessage>
+            <Button
+              button="link"
+              label={detailsExpanded ? __('View less') : __('View more')}
+              iconRight={detailsExpanded ? ICONS.UP : ICONS.DOWN}
+              onClick={() => setDetailsExpanded(!detailsExpanded)}
+            />
+          </h2>
+          {detailsExpanded && (
+            <div className="section__subtitle">
+              <dl>
+                <dt>
+                  <span className="dt__text">{__('...earned from others')}</span>
+                  <span className="help--dt">({__('Unlock to spend')})</span>
+                </dt>
+                <dd>
+                  <span className="dd__text">
+                    {Boolean(tipsBalance) && (
+                      <Button
+                        button="link"
+                        className="dd__button"
+                        disabled={operationPending}
+                        icon={ICONS.UNLOCK}
+                        onClick={() => doOpenModal(MODALS.MASS_TIP_UNLOCK)}
+                      />
                     )}
-                    <HelpLink navigate={`/$/${PAGES.BACKUP}`} />
-                  </h2>
-                </div>
-              </div>
-            )}
-            {/* @endif */}
+                    <CreditAmount amount={tipsBalance} precision={4} />
+                  </span>
+                </dd>
 
-            <div className="section">
-              <div className="section__flex">
-                <Icon sectionIcon icon={ICONS.SUPPORT} />
-                <h2 className="section__title--small">
-                  <strong>
-                    <CreditAmount amount={tipsBalance} precision={8} />
-                  </strong>{' '}
-                  {__('earned and bound in tips')}
-                </h2>
-              </div>
+                <dt>
+                  <span className="dt__text">{__('...on initial publishes')}</span>
+                  <span className="help--dt">({__('Delete or edit past content to spend')})</span>
+                </dt>
+                <dd>
+                  <CreditAmount amount={claimsBalance} precision={4} />
+                </dd>
+
+                <dt>
+                  <span className="dt__text">{__('...supporting content')}</span>
+                  <span className="help--dt">({__('Delete supports to spend')})</span>
+                </dt>
+                <dd>
+                  <CreditAmount amount={supportsBalance} precision={4} />
+                </dd>
+              </dl>
             </div>
+          )}
 
-            <div className="section">
-              <div className="section__flex">
-                <Icon sectionIcon icon={ICONS.LOCK} />
-                <div>
-                  <h2 className="section__title--small">
-                    <strong>
-                      <CreditAmount amount={claimsBalance + supportsBalance} precision={8} />
-                    </strong>{' '}
-                    {__('currently staked')}
-                  </h2>
-                  <div className="section__subtitle">
-                    <dl>
-                      <dt>{__('... in your publishes')}</dt>
-                      <dd>
-                        <CreditAmount amount={claimsBalance} precision={8} />
-                      </dd>
-
-                      <dt>{__('... in your supports')}</dt>
-                      <dd>
-                        <CreditAmount amount={supportsBalance} precision={8} />
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </React.Fragment>
-        </div>
-      </section>
-    </React.Fragment>
+          {/* @if TARGET='app' */}
+          {hasSynced ? (
+            <p className="section help">
+              {__('A backup of your wallet is synced with lbry.tv.')}
+              <HelpLink href="https://lbry.com/faq/account-sync" />
+            </p>
+          ) : (
+            <p className="help--warning">
+              {__('Your wallet is not currently synced with lbry.tv. You are in control of backing up your wallet.')}
+              <HelpLink navigate={`/$/${PAGES.BACKUP}`} />
+            </p>
+          )}
+          {/* @endif */}
+          <div className="section__actions">
+            <Button button="primary" label={__('Buy')} icon={ICONS.BUY} navigate={`/$/${PAGES.BUY}`} />
+            <Button button="secondary" label={__('Receive')} icon={ICONS.RECEIVE} navigate={`/$/${PAGES.RECEIVE}`} />
+            <Button button="secondary" label={__('Send')} icon={ICONS.SEND} navigate={`/$/${PAGES.SEND}`} />
+          </div>
+          {(otherCount > WALLET_CONSOLIDATE_UTXOS || consolidateIsPending || consolidatingUtxos) && (
+            <p className="help">
+              <I18nMessage
+                tokens={{
+                  now: (
+                    <Button
+                      button="link"
+                      onClick={() => doUtxoConsolidate()}
+                      disabled={operationPending}
+                      label={
+                        consolidateIsPending || consolidatingUtxos ? __('Consolidating...') : __('Consolidate Now')
+                      }
+                    />
+                  ),
+                  help: <HelpLink href="https://lbry.com/faq/transaction-types" />,
+                }}
+              >
+                Your wallet has a lot of change lying around. Consolidating will speed up your transactions. This could
+                take some time. %now%%help%
+              </I18nMessage>
+            </p>
+          )}
+        </>
+      }
+    />
   );
 };
 

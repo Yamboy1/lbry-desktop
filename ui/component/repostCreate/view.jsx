@@ -1,44 +1,48 @@
 // @flow
 
 import * as ICONS from 'constants/icons';
-import { CHANNEL_NEW, MINIMUM_PUBLISH_BID, INVALID_NAME_ERROR } from 'constants/claim';
+import { MINIMUM_PUBLISH_BID, INVALID_NAME_ERROR } from 'constants/claim';
 import React from 'react';
 import { useHistory } from 'react-router';
 import Card from 'component/common/card';
 import Button from 'component/button';
-import SelectChannel from 'component/selectChannel';
+import ChannelSelector from 'component/channelSelector';
 import { FormField } from 'component/common/form';
 import { parseURI, isNameValid, creditsToString, isURIValid, normalizeURI } from 'lbry-redux';
-import usePersistedState from 'effects/use-persisted-state';
 import analytics from 'analytics';
 import LbcSymbol from 'component/common/lbc-symbol';
 import ClaimPreview from 'component/claimPreview';
 import { URL as SITE_URL, URL_LOCAL, URL_DEV } from 'config';
 import HelpLink from 'component/common/help-link';
+import WalletSpendableBalanceHelp from 'component/walletSpendableBalanceHelp';
+import Spinner from 'component/spinner';
 
 type Props = {
   doToast: ({ message: string }) => void,
   doClearRepostError: () => void,
-  doRepost: StreamRepostOptions => Promise<*>,
+  doRepost: (StreamRepostOptions) => Promise<*>,
   title: string,
   claim?: StreamClaim,
   enteredContentClaim?: StreamClaim,
   balance: number,
   channels: ?Array<ChannelClaim>,
-  doCheckPublishNameAvailability: string => Promise<*>,
+  doCheckPublishNameAvailability: (string) => Promise<*>,
   error: ?string,
   reposting: boolean,
   uri: string,
   name: string,
   contentUri: string,
-  setRepostUri: string => void,
-  setContentUri: string => void,
+  setRepostUri: (string) => void,
+  setContentUri: (string) => void,
   doCheckPendingClaims: () => void,
   redirectUri?: string,
   passedRepostAmount: number,
   enteredRepostAmount: number,
   isResolvingPassedRepost: boolean,
   isResolvingEnteredRepost: boolean,
+  activeChannelClaim: ?ChannelClaim,
+  fetchingMyChannels: boolean,
+  incognito: boolean,
 };
 
 function RepostCreate(props: Props) {
@@ -50,7 +54,6 @@ function RepostCreate(props: Props) {
     claim,
     enteredContentClaim,
     balance,
-    channels,
     reposting,
     doCheckPublishNameAvailability,
     uri, // ?from
@@ -63,12 +66,14 @@ function RepostCreate(props: Props) {
     passedRepostAmount,
     isResolvingPassedRepost,
     isResolvingEnteredRepost,
+    activeChannelClaim,
+    fetchingMyChannels,
+    incognito,
   } = props;
 
   const defaultName = name || (claim && claim.name) || '';
   const contentClaimId = claim && claim.claim_id;
   const enteredClaimId = enteredContentClaim && enteredContentClaim.claim_id;
-  const [repostChannel, setRepostChannel] = usePersistedState('repost-channel', 'anonymous');
 
   const [repostBid, setRepostBid] = React.useState(0.01);
   const [repostBidError, setRepostBidError] = React.useState(undefined);
@@ -80,20 +85,18 @@ function RepostCreate(props: Props) {
 
   const { replace, goBack } = useHistory();
   const resolvingRepost = isResolvingEnteredRepost || isResolvingPassedRepost;
-  const repostUrlName = `lbry://${
-    !repostChannel || repostChannel === CHANNEL_NEW || repostChannel === 'anonymous' ? '' : `${repostChannel}/`
-  }`;
+  const repostUrlName = `lbry://${incognito || !activeChannelClaim ? '' : `${activeChannelClaim.name}/`}`;
 
   const contentFirstRender = React.useRef(true);
-  const setAutoRepostBid = amount => {
-    if (balance > amount) {
-      if (amount > 5) {
+  const setAutoRepostBid = (amount) => {
+    if (balance && balance > 0.02) {
+      if (uri) {
+        setRepostBid(0.01);
+      } else if (balance > amount) {
         setRepostBid(Number(amount.toFixed(2)));
       } else {
-        setRepostBid(5);
+        setRepostBid(0.01);
       }
-    } else if (balance) {
-      setRepostBid(0.01);
     }
   };
 
@@ -110,7 +113,7 @@ function RepostCreate(props: Props) {
     const isLbryUrl = value.startsWith('lbry://') && value !== 'lbry://';
     const error = '';
 
-    const addLbryIfNot = term => {
+    const addLbryIfNot = (term) => {
       return term.startsWith('lbry://') ? term : `lbry://${term}`;
     };
     if (wasCopiedFromWeb) {
@@ -173,20 +176,9 @@ function RepostCreate(props: Props) {
     contentNameError = __('A name is required');
   }
 
-  // repostChannel
-  const channelStrings = channels && channels.map(channel => channel.permanent_url).join(',');
-  React.useEffect(() => {
-    if (!repostChannel && channelStrings) {
-      const channels = channelStrings.split(',');
-      const newChannelUrl = channels[0];
-      const { claimName } = parseURI(newChannelUrl);
-      setRepostChannel(claimName);
-    }
-  }, [channelStrings]);
-
   React.useEffect(() => {
     if (enteredRepostName && isNameValid(enteredRepostName, false)) {
-      doCheckPublishNameAvailability(enteredRepostName).then(r => setAvailable(r));
+      doCheckPublishNameAvailability(enteredRepostName).then((r) => setAvailable(r));
     }
   }, [enteredRepostName, doCheckPublishNameAvailability]);
 
@@ -210,7 +202,7 @@ function RepostCreate(props: Props) {
     } else if (balance === repostBid) {
       rBidError = __('Please decrease your deposit to account for transaction fees');
     } else if (balance < repostBid) {
-      rBidError = __('Deposit cannot be higher than your balance');
+      rBidError = __('Deposit cannot be higher than your available balance');
     } else if (repostBid < MINIMUM_PUBLISH_BID) {
       rBidError = __('Your deposit must be higher');
     }
@@ -287,17 +279,20 @@ function RepostCreate(props: Props) {
   };
 
   function handleSubmit() {
-    const channelToRepostTo = channels && channels.find(channel => channel.name === repostChannel);
     if (enteredRepostName && repostBid && repostClaimId) {
       doRepost({
         name: enteredRepostName,
         bid: creditsToString(repostBid),
-        channel_id: channelToRepostTo ? channelToRepostTo.claim_id : undefined,
+        channel_id: activeChannelClaim && !incognito ? activeChannelClaim.claim_id : undefined,
         claim_id: repostClaimId,
       }).then((repostClaim: StreamClaim) => {
         doCheckPendingClaims();
         analytics.apiLogPublish(repostClaim);
-        doToast({ message: __('Woohoo! Successfully reposted this claim.') });
+        doToast({
+          message: __('Woohoo! Successfully reposted this claim.'),
+          linkText: __('Uploads'),
+          linkTarget: '/uploads',
+        });
         replace(getRedirect(contentUri, uri, redirectUri));
       });
     }
@@ -308,29 +303,40 @@ function RepostCreate(props: Props) {
     goBack();
   }
 
+  if (fetchingMyChannels) {
+    return (
+      <div className="main--empty">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <>
+      <ChannelSelector />
+
       <Card
         actions={
           <div>
             {uri && (
               <fieldset-section>
-                <ClaimPreview key={uri} uri={uri} actions={''} type={'inline'} showNullPlaceholder />
+                <ClaimPreview key={uri} uri={uri} actions={''} showNullPlaceholder />
               </fieldset-section>
             )}
             {!uri && name && (
               <>
                 <FormField
-                  label={'Content to repost'}
+                  label={__('Content to repost')}
                   type="text"
                   name="content_url"
                   value={enteredContent}
                   error={contentError}
-                  onChange={event => setEnteredContentUri(event.target.value)}
+                  onChange={(event) => setEnteredContentUri(event.target.value)}
                   placeholder={__('Enter a name or %domain% URL', { domain: SITE_URL })}
                 />
               </>
             )}
+
             {!uri && (
               <fieldset-section>
                 <ClaimPreview key={contentUri} uri={contentUri} actions={''} type={'large'} showNullPlaceholder />
@@ -357,17 +363,11 @@ function RepostCreate(props: Props) {
                     type="text"
                     name="repost_name"
                     value={enteredRepostName}
-                    onChange={event => setEnteredRepostName(event.target.value)}
-                    placeholder={__('Do a thing')}
+                    onChange={(event) => setEnteredRepostName(event.target.value)}
+                    placeholder={__('MyFunName')}
                   />
                 </fieldset-group>
               </fieldset-section>
-              <SelectChannel
-                label={__('Channel to repost on')}
-                hideNew
-                channel={repostChannel}
-                onChannelChange={newChannel => setRepostChannel(newChannel)}
-              />
 
               <FormField
                 type="number"
@@ -376,15 +376,20 @@ function RepostCreate(props: Props) {
                 step="any"
                 placeholder="0.123"
                 className="form-field--price-amount"
-                label={<LbcSymbol postfix={__('Support')} size={14} />}
+                label={<LbcSymbol postfix={__('Support --[button to support a claim]--')} size={14} />}
                 value={repostBid}
                 error={repostBidError}
-                helper={__('Winning amount: %amount%', {
-                  amount: Number(takeoverAmount).toFixed(2),
-                })}
+                helper={
+                  <>
+                    {__('Winning amount: %amount%', {
+                      amount: Number(takeoverAmount).toFixed(2),
+                    })}
+                    <WalletSpendableBalanceHelp inline />
+                  </>
+                }
                 disabled={!enteredRepostName || resolvingRepost}
-                onChange={event => setRepostBid(event.target.value)}
-                onWheel={e => e.stopPropagation()}
+                onChange={(event) => setRepostBid(event.target.value)}
+                onWheel={(e) => e.stopPropagation()}
               />
             </React.Fragment>
 

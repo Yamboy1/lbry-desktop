@@ -1,18 +1,15 @@
 // @flow
 import { remote } from 'electron';
 import React from 'react';
+import { lazyImport } from 'util/lazyImport';
 import classnames from 'classnames';
 import * as RENDER_MODES from 'constants/file_render_modes';
 import VideoViewer from 'component/viewers/videoViewer';
-import ImageViewer from 'component/viewers/imageViewer';
-import AppViewer from 'component/viewers/appViewer';
 import { withRouter } from 'react-router-dom';
 import fs from 'fs';
 import analytics from 'analytics';
 
 import DocumentViewer from 'component/viewers/documentViewer';
-import PdfViewer from 'component/viewers/pdfViewer';
-import HtmlViewer from 'component/viewers/htmlViewer';
 
 // @if TARGET='app'
 // should match
@@ -20,6 +17,11 @@ import DocxViewer from 'component/viewers/docxViewer';
 import ComicBookViewer from 'component/viewers/comicBookViewer';
 import ThreeViewer from 'component/viewers/threeViewer';
 // @endif
+
+const AppViewer = lazyImport(() => import('component/viewers/appViewer' /* webpackChunkName: "appViewer" */));
+const HtmlViewer = lazyImport(() => import('component/viewers/htmlViewer' /* webpackChunkName: "htmlViewer" */));
+const ImageViewer = lazyImport(() => import('component/viewers/imageViewer' /* webpackChunkName: "imageViewer" */));
+const PdfViewer = lazyImport(() => import('component/viewers/pdfViewer' /* webpackChunkName: "pdfViewer" */));
 
 type Props = {
   uri: string,
@@ -93,16 +95,24 @@ class FileRender extends React.PureComponent<Props> {
           />
         );
       case RENDER_MODES.IMAGE:
-        return <ImageViewer uri={uri} source={source} />;
+        return (
+          <React.Suspense fallback={null}>
+            <ImageViewer uri={uri} source={source} />
+          </React.Suspense>
+        );
       case RENDER_MODES.HTML:
-        return <HtmlViewer source={downloadPath || source} />;
+        return (
+          <React.Suspense fallback={null}>
+            <HtmlViewer source={downloadPath || source} />
+          </React.Suspense>
+        );
       case RENDER_MODES.DOCUMENT:
       case RENDER_MODES.MARKDOWN:
         return (
           <DocumentViewer
             source={{
               // @if TARGET='app'
-              file: options => fs.createReadStream(downloadPath, options),
+              file: (options) => fs.createReadStream(downloadPath, options),
               // @endif
               stream: source,
               fileExtension,
@@ -115,7 +125,11 @@ class FileRender extends React.PureComponent<Props> {
       case RENDER_MODES.DOCX:
         return <DocxViewer source={downloadPath} />;
       case RENDER_MODES.PDF:
-        return <PdfViewer source={downloadPath || source} />;
+        return (
+          <React.Suspense fallback={null}>
+            <PdfViewer source={downloadPath || source} />
+          </React.Suspense>
+        );
       case RENDER_MODES.CAD:
         return (
           <ThreeViewer
@@ -131,7 +145,7 @@ class FileRender extends React.PureComponent<Props> {
           <ComicBookViewer
             source={{
               // @if TARGET='app'
-              file: options => fs.createReadStream(downloadPath, options),
+              file: (options) => fs.createReadStream(downloadPath, options),
               // @endif
               stream: source,
             }}
@@ -139,7 +153,11 @@ class FileRender extends React.PureComponent<Props> {
           />
         );
       case RENDER_MODES.APPLICATION:
-        return <AppViewer uri={uri} />;
+        return (
+          <React.Suspense fallback={null}>
+            <AppViewer uri={uri} />
+          </React.Suspense>
+        );
     }
 
     return null;

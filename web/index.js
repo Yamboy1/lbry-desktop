@@ -6,6 +6,7 @@ const logger = require('koa-logger');
 const router = require('./src/routes');
 const redirectMiddleware = require('./middleware/redirect');
 const cacheControlMiddleware = require('./middleware/cache-control');
+const iframeDestroyerMiddleware = require('./middleware/iframe-destroyer');
 
 const app = new Koa();
 const DIST_ROOT = path.resolve(__dirname, 'dist');
@@ -25,6 +26,13 @@ app.use(async (ctx, next) => {
 app.use(logger());
 app.use(cacheControlMiddleware);
 app.use(redirectMiddleware);
+app.use(iframeDestroyerMiddleware);
+
+// Check if the request url matches any assets inside of /dist
+app.use(serve(DIST_ROOT, {
+  maxage: 3600000, // set a cache time of one hour, helpful for mobile dev
+}));
+
 app.use(serve(DIST_ROOT)); // Check if the request url matches any assets inside of /dist
 
 app.use(router.routes());

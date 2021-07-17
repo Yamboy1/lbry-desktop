@@ -55,7 +55,7 @@ We provide installers for Windows, macOS (v10.12.4, Sierra, or greater), and Deb
 | Latest Pre-release    | [Download](https://lbry.com/get/lbry.pre.exe) | [Download](https://lbry.com/get/lbry.pre.dmg) | [Download](https://lbry.com/get/lbry.pre.deb) |
 
 Our [releases page](https://github.com/lbryio/lbry-desktop/releases) also contains the latest
-release, pre-releases, and past builds.  
+release, pre-releases, and past builds.
 _Note: If the deb fails to install using the Ubuntu Software Center, install manually via `sudo dpkg -i <path to deb>`. You'll need to run `sudo apt-get install -f` if this is the first time installing it to install dependencies_
 
 To install from source or make changes to the application, continue to the next section below.
@@ -63,10 +63,10 @@ To install from source or make changes to the application, continue to the next 
 **Community maintained** builds for Arch Linux and Flatpak are available, see below. These installs will need to be updated manually as the in-app update process only supports Debian installs at this time.
 _Note: If coming from a deb install, the directory structure is different and you'll need to [migrate data](https://lbry.com/faq/backup-data)._
 
-|                | Flatpak                                                           | Arch                                                                                      | ARM/ARM64                                |
-| -------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------- |
-| Latest Release | [FlatHub Page](https://flathub.org/apps/details/io.lbry.lbry-app) | [AUR Package](https://aur.archlinux.org/packages/lbry-app-bin/)                           | [Build Guide](https://lbry.tv/@LBRYarm:5)          |
-| Maintainers    | [@kcSeb](https://keybase.io/kcseb)                                | [@kcSeb](https://keybase.io/kcseb)/[@TimurKiyivinski](https://github.com/TimurKiyivinski) | [@Madiator2011](https://github.com/kodxana) |
+|                | Flatpak                                                           | Arch                                                                                      | Nixpkgs                                                                            | ARM/ARM64                                   |
+| -------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------- |
+| Latest Release | [FlatHub Page](https://flathub.org/apps/details/io.lbry.lbry-app) | [AUR Package](https://aur.archlinux.org/packages/lbry-app-bin/)                           | [Nixpkgs](https://search.nixos.org/packages?channel=unstable&show=lbry&query=lbry) | [Build Guide](https://lbry.tv/@LBRYarm:5)   |
+| Maintainers    | [@kcSeb](https://keybase.io/kcseb)                                | [@kcSeb](https://keybase.io/kcseb)                                                        | [@Enderger](https://github.com/enderger)                                           | [@Madiator2011](https://github.com/kodxana) |
 
 ## Usage
 
@@ -79,7 +79,7 @@ You can run the web version (lbry.tv), the electron app, or both at the same tim
 #### Prerequisites
 
 - [Git](https://git-scm.com/downloads)
-- [Node.js](https://nodejs.org/en/download/) (v10 required)
+- [Node.js](https://nodejs.org/en/download/) (v14 required)
 - [Yarn](https://yarnpkg.com/en/docs/install)
 
 1. Clone (or [fork](https://help.github.com/articles/fork-a-repo/)) this repository: `git clone https://github.com/lbryio/lbry-desktop`
@@ -88,15 +88,11 @@ You can run the web version (lbry.tv), the electron app, or both at the same tim
 
 #### Run the electron app
 
-`yarn compile:electron` (this is only needed the first time you run the app)
-
 `yarn dev`
 
 - If you want to build and launch the production app you can run `yarn build`. This will give you an executable inside the `/dist` folder. We use [electron-builder](https://github.com/electron-userland/electron-builder) to create distributable packages.
 
 #### Run the web app for development
-
-`yarn compile:web` (this is only needed the first time you run the app)
 
 `yarn dev:web`
 
@@ -104,17 +100,18 @@ You can run the web version (lbry.tv), the electron app, or both at the same tim
 
 #### Customize the web app
 
-- In root directory, copy .env.defaults to .env and make changes
+- In root directory, duplicate the .env.default file and rename it to .env then copy the code below and paste it anywhere in the .env file.
 
 ```
 cp .env.defaults .env
 nano .env
 ```
+
 - To specify your own OG-IMAGE
-You can either place a png named v2-og.png in the /custom folder or specify the OG_IMAGE_URL in .env
+  You can either place a png named v2-og.png in the /custom folder or specify the OG_IMAGE_URL in .env
 
 - To specify your own channels to be followed on first run
-`AUTO_FOLLOW_URLS=lbry://@chan#123...a lbry://@chan2#456...a`
+  `AUTO_FOLLOW_URLS=lbry://@chan#123...a lbry://@chan2#456...a`
 
 - If you want to customize the homepage content
 
@@ -132,7 +129,7 @@ PINNED_LABEL_2=OtherLinkText
 ```
 
 - Finally `NODE_ENV=production yarn compile:web` to rebuild
-_Note: You don't need to edit the .env file in the /web folder - that is copied during compile._
+  _Note: You don't need to edit the .env file in the /web folder - that is copied during compile._
 
 #### Deploy the web app (_experimental_)
 
@@ -173,8 +170,9 @@ This project is MIT licensed. For the full license, see [LICENSE](LICENSE).
 
 ## Security
 
-We take security seriously. Please contact security@lbry.com regarding any security issues. Our PGP key is [here](https://keybase.io/lbry/key.asc) if you need it. All releases are signed by [Sean Yesmunt](https://keybase.io/seanyesmunt/key.asc).
+We take security seriously. Please contact security@lbry.com regarding any security issues. Our PGP key is [here](https://lbry.com/faq/pgp-key) if you need it. Previous versions up to v0.50.2 were signed by [Sean Yesmunt](https://keybase.io/seanyesmunt/key.asc).
+New Releases are signed by [Jessop Breth](https://keybase.io/jessopb/key.asc).
 
 ## Contact
 
-The primary contact for this project is [@seanyesmunt](https://github.com/seanyesmunt).
+The primary contact for this project is [@jessopb](https://github.com/jessopb).

@@ -4,16 +4,18 @@
 @import 'init/vars';
 @import 'init/mixins';
 @import 'init/gui';
-@import 'init/color';
+@import 'init/base-theme';
 @import 'themes/light.scss';
 @import 'themes/dark.scss';
 @import 'component/ads';
 @import 'component/animation';
 @import 'component/badge';
+@import 'component/block-list';
 @import 'component/button';
 @import 'component/card';
 @import 'component/channel';
 @import 'component/claim-list';
+@import 'component/collection';
 @import 'component/comments';
 @import 'component/content';
 @import 'component/dat-gui';
@@ -39,6 +41,7 @@
 @import 'component/notification';
 @import 'component/nudge';
 @import 'component/pagination';
+@import 'component/post';
 @import 'component/purchase';
 @import 'component/placeholder';
 @import 'component/progress';
@@ -50,12 +53,18 @@
 @import 'component/spinner';
 @import 'component/splash';
 @import 'component/status-bar';
-@import 'component/subscriptions';
+@import 'component/superchat';
 @import 'component/syntax-highlighter';
 @import 'component/table';
+@import 'component/livestream';
 @import 'component/tabs';
+@import 'component/tooltip';
 @import 'component/txo-list';
+@import 'component/videojs';
 @import 'component/tags';
 @import 'component/wunderbar';
 @import 'component/yrbl';
 @import 'component/empty';
+@import 'component/stripe-card';
+@import 'component/wallet-tip-send';
+

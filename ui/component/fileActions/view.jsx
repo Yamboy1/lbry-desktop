@@ -1,17 +1,21 @@
 // @flow
-import { SIMPLE_SITE, SITE_NAME, ENABLE_FILE_REACTIONS } from 'config';
+import { SITE_NAME, ENABLE_FILE_REACTIONS } from 'config';
 import * as PAGES from 'constants/pages';
 import * as MODALS from 'constants/modal_types';
 import * as ICONS from 'constants/icons';
 import React from 'react';
 import Button from 'component/button';
 import FileDownloadLink from 'component/fileDownloadLink';
-import { buildURI } from 'lbry-redux';
+import { buildURI, COLLECTIONS_CONSTS } from 'lbry-redux';
 import * as RENDER_MODES from 'constants/file_render_modes';
 import { useIsMobile } from 'effects/use-screensize';
 import ClaimSupportButton from 'component/claimSupportButton';
+import ClaimCollectionAddButton from 'component/claimCollectionAddButton';
 import { useHistory } from 'react-router';
 import FileReactions from 'component/fileReactions';
+import { Menu, MenuButton, MenuList, MenuItem } from '@reach/menu-button';
+import Icon from 'component/common/icon';
+import { webDownloadClaim } from 'util/downloadClaim';
 
 type Props = {
   uri: string,
@@ -25,6 +29,10 @@ type Props = {
   myChannels: ?Array<ChannelClaim>,
   doToast: ({ message: string }) => void,
   clearPlayingUri: () => void,
+  isLivestreamClaim: boolean,
+  reactionsDisabled: boolean,
+  download: (string) => void,
+  streamingUrl: ?string,
 };
 
 function FileActions(props: Props) {
@@ -40,10 +48,14 @@ function FileActions(props: Props) {
     myChannels,
     clearPlayingUri,
     doToast,
+    isLivestreamClaim,
+    reactionsDisabled,
+    download,
+    streamingUrl,
   } = props;
   const {
     push,
-    location: { pathname },
+    location: { pathname, search },
   } = useHistory();
   const isMobile = useIsMobile();
   const webShareable = costInfo && costInfo.cost === 0 && RENDER_MODES.WEB_SHAREABLE_MODES.includes(renderMode);
@@ -52,6 +64,8 @@ function FileActions(props: Props) {
   const claimId = claim && claim.claim_id;
   const { signing_channel: signingChannel } = claim;
   const channelName = signingChannel && signingChannel.name;
+  const fileName = claim && claim.value && claim.value.source && claim.value.source.name;
+
   // We want to use the short form uri for editing
   // This is what the user is used to seeing, they don't care about the claim id
   // We will select the claim id before they publish
@@ -68,20 +82,40 @@ function FileActions(props: Props) {
     editUri = buildURI(uriObject);
   }
 
+  const urlParams = new URLSearchParams(search);
+  const collectionId = urlParams.get(COLLECTIONS_CONSTS.COLLECTION_ID);
+
+  // @if TARGET='web'
+  const [downloadClicked, setDownloadClicked] = React.useState(false);
+
+  function handleWebDownload() {
+    // download() causes 'streamingUrl' to be populated.
+    download(uri);
+    setDownloadClicked(true);
+  }
+
+  React.useEffect(() => {
+    if (downloadClicked && streamingUrl) {
+      webDownloadClaim(streamingUrl, fileName);
+    }
+  }, [downloadClicked, streamingUrl, fileName]);
+  // @endif
+
   function handleRepostClick() {
     if (!hasChannels) {
       clearPlayingUri();
       push(`/$/${PAGES.CHANNEL_NEW}?redirect=${pathname}`);
       doToast({ message: __('A channel is required to repost on %SITE_NAME%', { SITE_NAME }) });
     } else {
-      push(`/$/${PAGES.REPOST_NEW}?from=${encodeURIComponent(uri)}`);
+      push(`/$/${PAGES.REPOST_NEW}?from=${encodeURIComponent(uri)}&redirect=${pathname}`);
     }
   }
 
   const lhsSection = (
     <>
-      {ENABLE_FILE_REACTIONS && <FileReactions uri={uri} />}
+      {ENABLE_FILE_REACTIONS && !reactionsDisabled && <FileReactions uri={uri} />}
       <ClaimSupportButton uri={uri} fileAction />
+      <ClaimCollectionAddButton uri={uri} fileAction />
       <Button
         button="alt"
         className="button--file-action"
@@ -98,27 +132,27 @@ function FileActions(props: Props) {
         icon={ICONS.SHARE}
         label={__('Share')}
         title={__('Share')}
-        onClick={() => openModal(MODALS.SOCIAL_SHARE, { uri, webShareable })}
+        onClick={() => openModal(MODALS.SOCIAL_SHARE, { uri, webShareable, collectionId })}
       />
     </>
   );
 
   const rhsSection = (
     <>
-      {!SIMPLE_SITE && <FileDownloadLink uri={uri} />}
-
+      {/* @if TARGET='app' */}
+      <FileDownloadLink uri={uri} />
+      {/* @endif */}
       {claimIsMine && (
         <Button
           className="button--file-action"
           icon={ICONS.EDIT}
-          label={__('Edit')}
-          navigate="/$/upload"
+          label={isLivestreamClaim ? __('Update') : __('Edit')}
+          navigate={`/$/${PAGES.UPLOAD}`}
           onClick={() => {
             prepareEdit(claim, editUri, fileInfo);
           }}
         />
       )}
-
       {showDelete && (
         <Button
           title={__('Remove from your library')}
@@ -128,14 +162,38 @@ function FileActions(props: Props) {
           onClick={() => openModal(MODALS.CONFIRM_FILE_REMOVE, { uri })}
         />
       )}
-      {!claimIsMine && (
-        <Button
-          title={__('Report content')}
+      <Menu>
+        <MenuButton
           className="button--file-action"
-          icon={ICONS.REPORT}
-          href={`https://lbry.com/dmca/${claimId}`}
-        />
-      )}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+        >
+          <Icon size={20} icon={ICONS.MORE} />
+        </MenuButton>
+        <MenuList className="menu__list">
+          {/* @if TARGET='web' */}
+          <MenuItem className="comment__menu-option" onSelect={handleWebDownload}>
+            <div className="menu__link">
+              <Icon aria-hidden icon={ICONS.DOWNLOAD} />
+              {__('Download')}
+            </div>
+          </MenuItem>
+          {/* @endif */}
+          {!claimIsMine && (
+            <MenuItem
+              className="comment__menu-option"
+              onSelect={() => push(`/$/${PAGES.REPORT_CONTENT}?claimId=${claimId}`)}
+            >
+              <div className="menu__link">
+                <Icon aria-hidden icon={ICONS.REPORT} />
+                {__('Report content')}
+              </div>
+            </MenuItem>
+          )}
+        </MenuList>
+      </Menu>
     </>
   );
 

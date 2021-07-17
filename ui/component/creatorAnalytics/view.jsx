@@ -15,18 +15,17 @@ import analytics from 'analytics';
 type Props = {
   claim: ?ChannelClaim,
   fetchingChannels: boolean,
-  prepareEdit: string => void,
 };
 
 const UNAUTHENTICATED_ERROR = 'unauthenticated';
 const GENERIC_ERROR = 'error';
 
 export default function CreatorAnalytics(props: Props) {
-  const { prepareEdit, claim } = props;
+  const { claim } = props;
   const history = useHistory();
   const [stats, setStats] = React.useState();
   const [error, setError] = React.useState();
-  const [fetchingStats, setFetchingStats] = React.useState(true);
+  const [fetchingStats, setFetchingStats] = React.useState(false);
   const claimId = claim && claim.claim_id;
   const channelHasClaims = claim && claim.meta && claim.meta.claims_in_channel && claim.meta.claims_in_channel > 0;
 
@@ -39,11 +38,11 @@ export default function CreatorAnalytics(props: Props) {
     if (claimId && channelForEffect && channelHasClaims) {
       setFetchingStats(true);
       Lbryio.call('reports', 'content', { claim_id: claimId })
-        .then(res => {
+        .then((res) => {
           setFetchingStats(false);
           setStats(res);
         })
-        .catch(error => {
+        .catch((error) => {
           if (error.response.status === 401) {
             setError(UNAUTHENTICATED_ERROR);
             const channelToSend = JSON.parse(channelForEffect);
@@ -81,7 +80,24 @@ export default function CreatorAnalytics(props: Props) {
                 />
               )}
 
-              {!error && (
+              {!error && !channelHasClaims ? (
+                <Yrbl
+                  type="sad"
+                  title={__("You haven't uploaded anything")}
+                  subtitle={__('Upload something to start tracking your stats!')}
+                  actions={
+                    <div className="section__actions">
+                      <Button
+                        button="primary"
+                        label={__('Upload Something')}
+                        onClick={() => {
+                          history.push(`/$/${PAGES.UPLOAD}`);
+                        }}
+                      />
+                    </div>
+                  }
+                />
+              ) : (
                 <Yrbl
                   title={
                     channelHasClaims
@@ -93,12 +109,7 @@ export default function CreatorAnalytics(props: Props) {
                       <Button
                         button="primary"
                         label={__('Upload Something')}
-                        onClick={() => {
-                          if (claim) {
-                            prepareEdit(claim.name);
-                            history.push(`/$/${PAGES.UPLOAD}`);
-                          }
-                        }}
+                        onClick={() => history.push(`/$/${PAGES.UPLOAD}`)}
                       />
                     </div>
                   }
@@ -206,12 +217,7 @@ export default function CreatorAnalytics(props: Props) {
                     button="primary"
                     icon={ICONS.PUBLISH}
                     label={__('Upload')}
-                    onClick={() => {
-                      if (claim) {
-                        prepareEdit(claim.name);
-                        history.push(`/$/${PAGES.UPLOAD}`);
-                      }
-                    }}
+                    onClick={() => history.push(`/$/${PAGES.UPLOAD}`)}
                   />
                 </div>
               }

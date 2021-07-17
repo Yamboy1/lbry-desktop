@@ -13,6 +13,10 @@ export const DEFAULT_FOLLOWED_TAGS = [
   'technology',
 ];
 
+export const DISABLE_COMMENTS_TAG = 'disable-comments';
+
+export const UTILITY_TAGS = [DISABLE_COMMENTS_TAG];
+
 export const MATURE_TAGS = [
   'porn',
   'porno',
